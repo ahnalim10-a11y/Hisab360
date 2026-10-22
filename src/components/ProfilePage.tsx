@@ -32,16 +32,7 @@ import {
 } from 'lucide-react';
 import { UserProfile, ArchiveItem } from '../types';
 import { Language, translations, monthsData, formatNumberByLang } from '../utils/i18n';
-import {
-  signInGoogleDrive,
-  signOutGoogleDrive,
-  saveBackupToGoogleDrive,
-  loadBackupFromGoogleDrive,
-  getCurrentDriveUser,
-  getDriveAccessToken,
-  initGoogleDriveAuth,
-} from '../utils/googleDrive';
-import { FullAppBackup } from '../utils/pdfGenerator';
+import { FullAppBackup, exportAppBackup } from '../utils/pdfGenerator';
 
 interface ProfilePageProps {
   userProfile: UserProfile;
@@ -49,15 +40,15 @@ interface ProfilePageProps {
   lang: Language;
   archives: ArchiveItem[];
   activeArchiveIndex: number;
-  autoDriveSync: boolean;
-  lastDriveSyncTime: string | null;
+  autoDriveSync?: boolean;
+  lastDriveSyncTime?: string | null;
   getFullBackupData: () => FullAppBackup;
   onBack: () => void;
   onUpdateProfile: (name: string, img: string, signatureUrl?: string) => void;
   onToggleDarkMode: () => void;
   onToggleLanguage: (newLang: Language) => void;
-  onToggleAutoDriveSync: (enabled: boolean) => void;
-  onSetLastDriveSyncTime: (time: string) => void;
+  onToggleAutoDriveSync?: (enabled: boolean) => void;
+  onSetLastDriveSyncTime?: (time: string) => void;
   onStartNewMonth: (startDate: string, endDate: string) => void;
   onSelectArchive: (index: number) => void;
   onLoadSampleData?: () => void;
@@ -181,11 +172,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     if (sigFileInputRef.current) sigFileInputRef.current.value = '';
   };
 
-  // Google Drive state
-  const [googleUser, setGoogleUser] = useState<any>(getCurrentDriveUser());
-  const [isDriveBusy, setIsDriveBusy] = useState(false);
-  const [driveStatusMsg, setDriveStatusMsg] = useState<string | null>(null);
-
   // New Month Modal
   const [isNewMonthModalOpen, setIsNewMonthModalOpen] = useState(false);
   const [startDate, setStartDate] = useState(
@@ -198,12 +184,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       .toISOString()
       .split('T')[0]
   );
-
-  useEffect(() => {
-    initGoogleDriveAuth((user) => {
-      setGoogleUser(user);
-    });
-  }, []);
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -251,114 +231,23 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Google Drive & Firebase Auth Handlers
-  const handleGoogleSignIn = async () => {
-    setIsDriveBusy(true);
-    setDriveStatusMsg(lang === 'bn' ? 'Google অ্যাকাউন্টে সাইন-ইন হচ্ছে...' : 'Signing in with Google...');
-    try {
-      const res = await signInGoogleDrive();
-      if (res?.user) {
-        setGoogleUser(res.user);
-        // Automatically enable auto drive sync so updates continuously save to Google Drive
-        onToggleAutoDriveSync(true);
-
-        // Update profile name and image from Google user if available
-        const newName = res.user.displayName || res.user.email || name;
-        const newImg = res.user.photoURL || img;
-        if (newName !== name || newImg !== img) {
-          setName(newName);
-          if (newImg) setImg(newImg);
-          onUpdateProfile(newName, newImg, signatureUrl);
-        }
-
-        // Immediately trigger an initial backup to Google Drive
-        try {
-          const backup = getFullBackupData();
-          const syncRes = await saveBackupToGoogleDrive(backup);
-          if (syncRes.success) {
-            const timeNow = new Date().toLocaleTimeString(lang === 'bn' ? 'bn-BD' : 'en-US');
-            onSetLastDriveSyncTime(timeNow);
-          }
-        } catch (syncErr) {
-          console.warn('Initial backup to Google Drive notice:', syncErr);
-        }
-
-        setDriveStatusMsg(
-          lang === 'bn'
-            ? 'Google ড্রাইভ সফলভাবে সংযুক্ত ও ব্যাকআপ সংরক্ষিত হয়েছে!'
-            : 'Google Drive connected and backup saved!'
-        );
-        setTimeout(() => setDriveStatusMsg(null), 4000);
-      }
-    } catch (err: any) {
-      console.error('Google Sign-in failed:', err);
-      setDriveStatusMsg(
-        lang === 'bn'
-          ? `কানেক্ট হতে পারেনি (${err.message || 'Error'})। অনুগ্রহ করে পুনরায় চেষ্টা করুন।`
-          : `Failed to connect (${err.message || 'Error'}). Please try again.`
-      );
-    } finally {
-      setIsDriveBusy(false);
+  // Offline Backup & Restore Handlers
+  const handleExportBackupClick = () => {
+    if (onExportBackup) {
+      onExportBackup();
+    } else {
+      exportAppBackup(getFullBackupData());
     }
   };
 
-  const handleGoogleSignOut = async () => {
-    if (confirm(lang === 'bn' ? 'Google ড্রাইভ সংযোগ বিচ্ছিন্ন করতে চান?' : 'Disconnect Google Drive?')) {
-      await signOutGoogleDrive();
-      setGoogleUser(null);
-      setDriveStatusMsg(null);
-    }
-  };
-
-  const handleSaveToDriveNow = async () => {
-    if (!getDriveAccessToken()) {
-      await handleGoogleSignIn();
-      if (!getDriveAccessToken()) return;
-    }
-
-    setIsDriveBusy(true);
-    setDriveStatusMsg(t.savingToDrive);
-    try {
-      const backup = getFullBackupData();
-      const res = await saveBackupToGoogleDrive(backup);
-      if (res.success) {
-        const timeNow = new Date().toLocaleTimeString(lang === 'bn' ? 'bn-BD' : 'en-US');
-        onSetLastDriveSyncTime(timeNow);
-        setDriveStatusMsg(t.savedToDriveSuccess);
-        setTimeout(() => setDriveStatusMsg(null), 3500);
-      }
-    } catch (err: any) {
-      setDriveStatusMsg(`⚠️ ${t.driveError}: ${err.message || 'Failed'}`);
-    } finally {
-      setIsDriveBusy(false);
-    }
-  };
-
-  const handleRestoreFromDrive = async () => {
-    if (!getDriveAccessToken()) {
-      await handleGoogleSignIn();
-      if (!getDriveAccessToken()) return;
-    }
-
-    if (!confirm(lang === 'bn' ? 'গুগল ড্রাইভ থেকে সর্বশেষ ব্যাকআপ এনে বর্তমান অ্যাপে রিস্টোর করতে চান?' : 'Restore latest backup from Google Drive?')) {
-      return;
-    }
-
-    setIsDriveBusy(true);
-    setDriveStatusMsg(lang === 'bn' ? 'ড্রাইভ থেকে ডাটা লোড হচ্ছে...' : 'Loading from Drive...');
-    try {
-      const data = await loadBackupFromGoogleDrive();
-      if (data) {
-        onImportBackup(data);
-        setDriveStatusMsg(lang === 'bn' ? 'গুগল ড্রাইভ থেকে রিস্টোর সম্পন্ন হয়েছে!' : 'Restored from Google Drive!');
-        setTimeout(() => setDriveStatusMsg(null), 3500);
-      } else {
-        setDriveStatusMsg(lang === 'bn' ? 'গুগল ড্রাইভে কোনো ব্যাকআপ ফাইল পাওয়া যায়নি।' : 'No backup file found in Drive.');
-      }
-    } catch (err: any) {
-      setDriveStatusMsg(`⚠️ ${err.message || 'Error loading'}`);
-    } finally {
-      setIsDriveBusy(false);
+  const handleResetAllData = () => {
+    const confirmText =
+      lang === 'bn'
+        ? 'আপনি কি নিশ্চিত যে সকল হিসাব মুছে ফেলতে চান? এটি আর ফিরিয়ে আনা যাবে না (যদি না আগে ব্যাকআপ ফাইল ডাউনলোড করা থাকে)।'
+        : 'Are you sure you want to clear all data? This cannot be undone unless you have an exported backup.';
+    if (confirm(confirmText)) {
+      localStorage.clear();
+      window.location.reload();
     }
   };
 
@@ -458,8 +347,12 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               <span className="font-bold text-white mt-0.5 block">{archives.length} টি</span>
             </div>
             <div className="bg-white/10 rounded-xl p-2 backdrop-blur-xs">
-              <span className="text-[10px] text-emerald-200 block">ড্রাইভ সিঙ্ক</span>
-              <span className="font-bold text-white mt-0.5 block">{googleUser ? 'সংযুক্ত' : 'অফলাইন'}</span>
+              <span className="text-[10px] text-emerald-200 block">
+                {lang === 'bn' ? 'ডাটা স্টোরেজ' : 'Data Storage'}
+              </span>
+              <span className="font-bold text-white mt-0.5 block">
+                {lang === 'bn' ? '১০০% অফলাইন' : '100% Local'}
+              </span>
             </div>
             <div className="bg-white/10 rounded-xl p-2 backdrop-blur-xs">
               <span className="text-[10px] text-emerald-200 block">ডিজিটাল স্বাক্ষর</span>
@@ -743,130 +636,74 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
         </div>
 
-        {/* 3. GOOGLE DRIVE BACKUP & AUTO-SYNC */}
-        <div className="p-5 rounded-3xl bg-white dark:bg-stone-900 border-2 border-sky-500/50 dark:border-sky-600 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
+        {/* 3. OFFLINE DATA BACKUP & RESTORE */}
+        <div className="p-5 rounded-3xl bg-white dark:bg-stone-900 border-2 border-emerald-500/40 dark:border-emerald-600 shadow-sm space-y-3.5">
+          <div className="flex items-center justify-between mb-1">
             <h3 className="font-bold text-sm text-stone-800 dark:text-stone-100 flex items-center gap-2">
-              <Cloud className="w-5 h-5 text-sky-600" />
-              {t.googleDriveBackup}
+              <Database className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <span>{lang === 'bn' ? 'অফলাইন ডাটা ব্যাকআপ ও রিস্টোর' : 'Offline Data Backup & Restore'}</span>
             </h3>
-            <span className="text-[10px] bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-300 px-2 py-0.5 rounded-full font-bold">
-              Google Cloud
+            <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold">
+              {lang === 'bn' ? '১০০% অফলাইন' : '100% Offline'}
             </span>
           </div>
-          <p className="text-xs text-stone-500 mb-3">{t.googleDriveSub}</p>
 
-          {/* Drive Status Alert */}
-          {driveStatusMsg && (
-            <div className="p-2.5 rounded-xl mb-3 text-xs font-semibold bg-sky-50 dark:bg-sky-950 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-800 flex items-center gap-2">
-              <RefreshCw className={`w-3.5 h-3.5 ${isDriveBusy ? 'animate-spin' : ''}`} />
-              <span>{driveStatusMsg}</span>
-            </div>
-          )}
+          <p className="text-xs text-stone-500">
+            {lang === 'bn'
+              ? 'আপনার সকল হিসাব আপনার ব্রাউজার ও ডিভাইসে সম্পূর্ণ নিরাপদে সংরক্ষিত থাকে। গুগল লগইন ছাড়াও যেকোনো সময় এক ক্লিকে ব্যাকআপ ফাইল (.json) ডাউনলোড করে রাখতে পারেন এবং প্রয়োজনে রিস্টোর করতে পারবেন।'
+              : 'All your finances are stored safely on your device. No cloud login required. Download a complete JSON backup anytime and restore on any device.'}
+          </p>
 
-          {!googleUser ? (
-            /* Sign In Button with Official Google Branding */
-            <div className="space-y-2.5">
-              <button
-                onClick={handleGoogleSignIn}
-                disabled={isDriveBusy}
-                className="w-full py-2.5 px-4 bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded-xl shadow-xs flex items-center justify-center gap-3 hover:bg-stone-50 dark:hover:bg-stone-700/60 active:scale-98 transition cursor-pointer"
-              >
-                <svg className="w-5 h-5" viewBox="0 0 48 48">
-                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                </svg>
-                <span className="font-bold text-xs sm:text-sm text-stone-700 dark:text-stone-200">
-                  {t.signInWithGoogle}
-                </span>
-              </button>
-              <div className="p-2.5 rounded-xl bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700/60 text-[11px] text-stone-600 dark:text-stone-400 flex items-start gap-2">
-                <ShieldCheck className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
-                <span>
-                  আপনার গুগল একাউন্ট (যেমন ahn.alim10@gmail.com) দিয়ে লগইন করলে স্বয়ংক্রিয়ভাবে গুগল ড্রাইভে ব্যাকআপ আপডেট হতে থাকবে। অ্যাপে না ঢুকেও সরাসরি গুগল ড্রাইভ থেকে হিসাব ডাউনলোড করতে পারবেন।
-                </span>
-              </div>
-            </div>
-          ) : (
-            /* Signed In User View with Auto-Sync & Action Buttons */
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-stone-100 dark:bg-stone-800 text-xs">
-                <div className="flex items-center gap-2">
-                  {googleUser.photoURL ? (
-                    <img src={googleUser.photoURL} alt="" className="w-6 h-6 rounded-full" />
-                  ) : (
-                    <div className="w-6 h-6 rounded-full bg-sky-600 text-white flex items-center justify-center font-bold text-[10px]">
-                      G
-                    </div>
-                  )}
-                  <span className="font-semibold text-stone-800 dark:text-stone-200 truncate max-w-[170px]">
-                    {googleUser.displayName || googleUser.email}
-                  </span>
-                </div>
-                <button
-                  onClick={handleGoogleSignOut}
-                  className="text-rose-500 hover:text-rose-600 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>{t.signOut}</span>
-                </button>
-              </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleFileChange}
+            className="hidden"
+          />
 
-              {/* Auto Sync Toggle */}
-              <div className="flex items-center justify-between p-2 rounded-xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/80">
-                <div className="text-xs">
-                  <span className="font-bold text-sky-900 dark:text-sky-200 block">
-                    {t.autoSyncToDrive}
-                  </span>
-                  <span className="text-[10px] text-stone-500">
-                    {lastDriveSyncTime ? `${t.lastSynced} ${lastDriveSyncTime}` : 'হিসাব পরিবর্তন হলেই স্বয়ংক্রিয় সেভ'}
-                  </span>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={autoDriveSync}
-                    onChange={(e) => onToggleAutoDriveSync(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-600" />
-                </label>
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+            <button
+              type="button"
+              onClick={handleExportBackupClick}
+              className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+              <span>{lang === 'bn' ? 'ব্যাকআপ ডাউনলোড (.json)' : 'Download Backup (.json)'}</span>
+            </button>
 
-              {/* Sync Actions */}
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={handleSaveToDriveNow}
-                  disabled={isDriveBusy}
-                  className="py-2 px-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 shadow-xs cursor-pointer"
-                >
-                  <CloudUpload className="w-4 h-4" />
-                  <span>{t.saveToDriveNow}</span>
-                </button>
-                <button
-                  onClick={handleRestoreFromDrive}
-                  disabled={isDriveBusy}
-                  className="py-2 px-2.5 rounded-xl bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 border border-stone-300 dark:border-stone-700 cursor-pointer"
-                >
-                  <CloudDownload className="w-4 h-4 text-sky-600" />
-                  <span>{t.restoreFromDrive}</span>
-                </button>
-              </div>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="py-2.5 px-3 rounded-xl bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 active:scale-98 text-stone-700 dark:text-stone-200 font-bold text-xs flex items-center justify-center gap-2 border border-stone-300 dark:border-stone-700 transition cursor-pointer"
+            >
+              <Upload className="w-4 h-4 text-emerald-600" />
+              <span>{lang === 'bn' ? 'ব্যাকআপ রিস্টোর করুন' : 'Restore Backup (.json)'}</span>
+            </button>
+          </div>
 
-              {/* Drive continuous sync notification banner */}
-              <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-800 dark:text-emerald-200">
-                <div className="font-bold flex items-center gap-1.5 mb-0.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span>গুগল ড্রাইভ ও ক্লাউড ডাটাবেস সংযুক্ত</span>
-                </div>
-                <p className="text-stone-600 dark:text-stone-300 text-[10px] leading-relaxed">
-                  আপনার প্রতি হিসাব পরিবর্তনের সাথে সাথে গুগল ড্রাইভে স্বয়ংক্রিয় ব্যাকআপ সংরক্ষিত হচ্ছে। আপনি অ্যাপে প্রবেশ না করেও সরাসরি আপনার গুগল ড্রাইভ থেকে <span className="font-mono font-bold text-stone-800 dark:text-stone-100">"hisab_khata_backup.json"</span> ফাইল দেখতে ও যেকোনো সময় ডাউনলোড করতে পারবেন।
-                </p>
-              </div>
-            </div>
-          )}
+          <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-[11px] text-emerald-800 dark:text-emerald-300 flex items-start gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            <span>
+              {lang === 'bn'
+                ? 'গুগল লগইন অপশন বন্ধ রাখা হয়েছে। আপনার হিসাব কারও সাথে শেয়ার হবে না, সম্পূর্ণ ব্যক্তিগত থাকবে।'
+                : 'Google login is disabled. Your data remains strictly local and completely private.'}
+            </span>
+          </div>
+
+          <div className="pt-2 border-t border-stone-200 dark:border-stone-800 flex justify-between items-center">
+            <span className="text-[11px] text-stone-500">
+              {lang === 'bn' ? 'নতুন করে শুরু করতে চান?' : 'Want to start fresh?'}
+            </span>
+            <button
+              type="button"
+              onClick={handleResetAllData}
+              className="text-[11px] text-rose-600 dark:text-rose-400 hover:text-rose-700 font-semibold flex items-center gap-1 cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>{lang === 'bn' ? 'সকল ডাটা মুছুন' : 'Reset All Data'}</span>
+            </button>
+          </div>
         </div>
 
         {/* 4. Month Archive Management (Restored Clean Design) */}

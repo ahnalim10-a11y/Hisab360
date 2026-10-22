@@ -38,7 +38,6 @@ import { ProfilePage } from './components/ProfilePage';
 import { DownloadAndExportModal } from './components/DownloadAndExportModal';
 import { Language, translations, formatMoneyByLang, quotesByLang } from './utils/i18n';
 import { exportAppBackup, FullAppBackup } from './utils/pdfGenerator';
-import { getDriveAccessToken, saveBackupToGoogleDrive } from './utils/googleDrive';
 import { initBackButton } from './utils/backButton';
 
 // Default initial state
@@ -350,24 +349,7 @@ export default function App() {
     archives,
   });
 
-  // Google Drive auto-sync effect (debounced)
-  useEffect(() => {
-    if (!autoDriveSync || !getDriveAccessToken()) return;
-    const timer = setTimeout(async () => {
-      try {
-        const fullBackup = getFullBackupData();
-        const res = await saveBackupToGoogleDrive(fullBackup);
-        if (res.success) {
-          const timeNow = new Date().toLocaleTimeString(lang === 'bn' ? 'bn-BD' : 'en-US');
-          setLastDriveSyncTime(timeNow);
-          localStorage.setItem('hk_last_drive_sync', timeNow);
-        }
-      } catch (err) {
-        console.warn('Google Drive auto-sync note:', err);
-      }
-    }, 2500);
-    return () => clearTimeout(timer);
-  }, [transactions, marketLists, shops, debtPeople, debtHistory, budgets, autoDriveSync, lang]);
+
 
   // Rotating quotes interval
   useEffect(() => {
@@ -1024,7 +1006,7 @@ export default function App() {
             />
           )}
 
-          {/* 9. PROFILE PAGE (Dark mode, Language, Google Drive sync) */}
+          {/* 9. PROFILE PAGE (Dark mode, Language, Offline Backup) */}
           {currentPage === 'profile' && (
             <ProfilePage
               userProfile={userProfile}
@@ -1032,8 +1014,6 @@ export default function App() {
               lang={lang}
               archives={archives}
               activeArchiveIndex={activeArchiveIndex}
-              autoDriveSync={autoDriveSync}
-              lastDriveSyncTime={lastDriveSyncTime}
               getFullBackupData={getFullBackupData}
               selectedMonthIdx={selectedMonthIdx}
               selectedYear={selectedYear}
@@ -1042,11 +1022,6 @@ export default function App() {
               onUpdateProfile={handleUpdateProfile}
               onToggleDarkMode={() => setDarkMode(!darkMode)}
               onToggleLanguage={(newLang) => setLang(newLang)}
-              onToggleAutoDriveSync={(enabled) => setAutoDriveSync(enabled)}
-              onSetLastDriveSyncTime={(time) => {
-                setLastDriveSyncTime(time);
-                localStorage.setItem('hk_last_drive_sync', time);
-              }}
               onStartNewMonth={handleStartNewMonth}
               onSelectArchive={handleSelectArchive}
               onLoadSampleData={handleLoadSampleData}

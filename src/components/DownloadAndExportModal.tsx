@@ -8,6 +8,7 @@ import {
   FileSpreadsheet,
   FileText,
   Cloud,
+  Database,
   X,
   HelpCircle,
   Copy,
@@ -290,17 +291,17 @@ export const DownloadAndExportModal: React.FC<DownloadAndExportModalProps> = ({
                 </button>
               </div>
 
-              {/* Option 2: Google Drive Auto-Sync */}
-              <div className="p-3 bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 rounded-2xl flex items-center justify-between">
+              {/* Option 2: Offline Backup & Restore */}
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-2xl flex items-center justify-between">
                 <div>
-                  <div className="font-bold text-sky-900 dark:text-sky-200 flex items-center gap-1.5">
-                    <Cloud className="w-4 h-4 text-sky-600" />
-                    <span>{lang === 'bn' ? 'গুগল ড্রাইভ ক্লাউড সেভ' : 'Google Drive Cloud Sync'}</span>
+                  <div className="font-bold text-emerald-950 dark:text-emerald-200 flex items-center gap-1.5">
+                    <Database className="w-4 h-4 text-emerald-600" />
+                    <span>{lang === 'bn' ? 'অফলাইন ব্যাকআপ ও রিস্টোর' : 'Offline Backup & Restore'}</span>
                   </div>
                   <div className="text-[10px] text-stone-500 mt-0.5">
                     {lang === 'bn'
-                      ? 'স্বয়ংক্রিয়ভাবে গুগল ড্রাইভে ব্যাকআপ জমা রাখতে প্রোফাইলে যান।'
-                      : 'Automatically save backups to Google Drive.'}
+                      ? 'ডিভাইসে ব্যাকআপ রাখা এবং ফাইল থেকে ডাটা রিস্টোর করার সুবিধা।'
+                      : 'Restore saved backups and manage offline storage.'}
                   </div>
                 </div>
                 <button
@@ -308,9 +309,9 @@ export const DownloadAndExportModal: React.FC<DownloadAndExportModalProps> = ({
                     onClose();
                     onNavigateToProfile();
                   }}
-                  className="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs shrink-0 cursor-pointer shadow-xs"
+                  className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shrink-0 cursor-pointer shadow-xs"
                 >
-                  {lang === 'bn' ? 'সেটিংস দেখুন' : 'Configure'}
+                  {lang === 'bn' ? 'প্রোফাইলে যান' : 'Open Profile'}
                 </button>
               </div>
 
