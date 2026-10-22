@@ -1,0 +1,11 @@
+{
+  "appId": "com.alimgmsbd.hisabkhata",
+  "appName": "হিসাব খাতা",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true
+  }
+}
