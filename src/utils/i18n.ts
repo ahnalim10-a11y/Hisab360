@@ -96,7 +96,7 @@ export const translations = {
     budgetMenu: 'বাজেট',
     debtMenu: 'দেনা-পাওনা',
     calculatorMenu: 'ক্যালকুলেটর',
-    reportPdfMenu: 'সামারি',
+    reportPdfMenu: 'রিপোর্ট',
     
     // Reports
     reportTitle: 'হিসাব রিপোর্ট ও বিবরণী',
@@ -209,7 +209,7 @@ export const translations = {
     budgetMenu: 'Budget',
     debtMenu: 'Debts & Loans',
     calculatorMenu: 'Calculator',
-    reportPdfMenu: 'Summary',
+    reportPdfMenu: 'Report',
     
     // Reports
     reportTitle: 'Financial Report & Statement',
