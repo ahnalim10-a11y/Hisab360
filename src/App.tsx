@@ -110,37 +110,37 @@ export default function App() {
   // State with LocalStorage persistence
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem('hk_trans');
-    return saved ? JSON.parse(saved) : defaultTransactions;
+    return saved !== null ? JSON.parse(saved) : defaultTransactions;
   });
 
   const [marketLists, setMarketLists] = useState<MarketList[]>(() => {
     const saved = localStorage.getItem('hk_markets');
-    return saved ? JSON.parse(saved) : defaultMarket;
+    return saved !== null ? JSON.parse(saved) : defaultMarket;
   });
 
   const [shops, setShops] = useState<Shop[]>(() => {
     const saved = localStorage.getItem('hk_shops');
-    return saved ? JSON.parse(saved) : defaultShops;
+    return saved !== null ? JSON.parse(saved) : defaultShops;
   });
 
   const [debtPeople, setDebtPeople] = useState<DebtPerson[]>(() => {
     const saved = localStorage.getItem('hk_debt_people');
-    return saved ? JSON.parse(saved) : defaultDebt;
+    return saved !== null ? JSON.parse(saved) : defaultDebt;
   });
 
   const [debtHistory, setDebtHistory] = useState<DebtHistory[]>(() => {
     const saved = localStorage.getItem('hk_debt_hist');
-    return saved ? JSON.parse(saved) : [];
+    return saved !== null ? JSON.parse(saved) : [];
   });
 
   const [budgets, setBudgets] = useState<Budget[]>(() => {
     const saved = localStorage.getItem('hk_budgets');
-    return saved ? JSON.parse(saved) : defaultBudgets;
+    return saved !== null ? JSON.parse(saved) : defaultBudgets;
   });
 
   const [billPayments, setBillPayments] = useState<BillPayment[]>(() => {
     const saved = localStorage.getItem('hk_bill_payments');
-    return saved ? JSON.parse(saved) : [];
+    return saved !== null ? JSON.parse(saved) : [];
   });
 
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
@@ -878,19 +878,15 @@ export default function App() {
                   </span>
                 </button>
 
-                {/* Report Grid Button with Download & PDF Highlight */}
+                {/* Summary Grid Button */}
                 <button
                   onClick={() => setCurrentPage('report')}
-                  className="p-3.5 rounded-2xl bg-white dark:bg-stone-900 border-2 border-emerald-500/80 dark:border-emerald-600 flex flex-col items-center justify-center gap-2 hover:bg-emerald-50/50 dark:hover:bg-stone-800/60 transition active:scale-95 shadow-xs group cursor-pointer relative overflow-hidden"
+                  className="p-3.5 rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/90 dark:border-stone-800 flex flex-col items-center justify-center gap-2 hover:border-teal-500 hover:bg-teal-50/30 dark:hover:bg-stone-800/60 transition active:scale-95 shadow-2xs group cursor-pointer"
                 >
-                  <div className="absolute top-1.5 right-1.5 flex items-center gap-0.5 text-[9px] bg-emerald-600 text-white px-1.5 py-0.2 rounded-full font-bold">
-                    <Sparkles className="w-2.5 h-2.5" />
-                    PDF
-                  </div>
-                  <div className="w-11 h-11 rounded-2xl bg-emerald-500 text-white flex items-center justify-center group-hover:scale-105 transition-transform shadow-xs">
+                  <div className="w-11 h-11 rounded-2xl bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300 flex items-center justify-center group-hover:scale-105 transition-transform">
                     <FileText className="w-6 h-6" />
                   </div>
-                  <span className="font-bold text-xs text-emerald-800 dark:text-emerald-300 text-center">
+                  <span className="font-bold text-xs text-stone-800 dark:text-stone-200 text-center">
                     {t.reportPdfMenu}
                   </span>
                 </button>
@@ -904,6 +900,9 @@ export default function App() {
               transactions={activeTransactions}
               isArchiveMode={isArchiveMode}
               lang={lang}
+              userName={userProfile.name}
+              activePeriodName={activePeriodName}
+              signatureUrl={userProfile.signatureUrl}
               onBack={() => setCurrentPage('home')}
               onSaveTransaction={handleSaveTransaction}
               onDeleteTransaction={handleDeleteTransaction}
@@ -919,6 +918,9 @@ export default function App() {
               billPayments={activeBillPayments}
               isArchiveMode={isArchiveMode}
               lang={lang}
+              userName={userProfile.name}
+              activePeriodName={activePeriodName}
+              signatureUrl={userProfile.signatureUrl}
               onBack={() => setCurrentPage('home')}
               onSaveMarket={handleSaveMarket}
               onDeleteMarket={handleDeleteMarket}
@@ -942,6 +944,9 @@ export default function App() {
               marketLists={activeMarketLists}
               isArchiveMode={isArchiveMode}
               lang={lang}
+              userName={userProfile.name}
+              activePeriodName={activePeriodName}
+              signatureUrl={userProfile.signatureUrl}
               onBack={() => setCurrentPage('home')}
               onSaveBudget={handleSaveBudget}
               onCompleteBudget={handleCompleteBudget}
@@ -956,6 +961,9 @@ export default function App() {
               debtHistory={activeDebtHistory}
               isArchiveMode={isArchiveMode}
               lang={lang}
+              userName={userProfile.name}
+              activePeriodName={activePeriodName}
+              signatureUrl={userProfile.signatureUrl}
               onBack={() => setCurrentPage('home')}
               onSaveDebt={handleSaveDebt}
               onDeletePerson={handleDeleteDebtPerson}

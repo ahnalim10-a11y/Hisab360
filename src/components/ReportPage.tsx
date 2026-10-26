@@ -25,6 +25,7 @@ import {
   sharePdfFile,
   openPdfInNewTab,
   printOrSaveAsPdf,
+  exportToCSV,
   ReportData,
 } from '../utils/pdfGenerator';
 import { Language, translations } from '../utils/i18n';
@@ -121,23 +122,27 @@ export const ReportPage: React.FC<ReportPageProps> = ({
     .filter((p) => p.dir === 'take')
     .reduce((sum, p) => sum + p.amount, 0);
 
-  const buildReportData = (sections: ReportSectionsSelection): ReportData => ({
-    periodName: activePeriodName || 'অক্টোবর -২০২৬ (০৭/১০/২০২৬ হতে ০৮/১১/২০২৬)',
-    userName: userName || 'ব্যবহারকারী',
-    signatureUrl: effectiveSignature,
-    generatedDate: getTodayBengaliDate(),
-    totalIncome,
-    totalExpense,
-    netSavings,
-    totalDebtGiven,
-    totalDebtTaken,
-    transactions,
-    marketLists,
-    debtPeople,
-    billPayments,
-    budgets,
-    sections,
-  });
+  const buildReportData = (sections: ReportSectionsSelection): ReportData => {
+    const inc = sections.transactions ? totalIncome : 0;
+    const exp = (sections.transactions ? transExpense : 0) + (sections.market ? marketExpense : 0);
+    return {
+      periodName: activePeriodName || 'অক্টোবর -২০২৬ (০৭/১০/২০২৬ হতে ০৮/১১/২০২৬)',
+      userName: userName || 'ব্যবহারকারী',
+      signatureUrl: effectiveSignature,
+      generatedDate: getTodayBengaliDate(),
+      totalIncome: inc,
+      totalExpense: exp,
+      netSavings: inc - exp,
+      totalDebtGiven: sections.debt ? totalDebtGiven : 0,
+      totalDebtTaken: sections.debt ? totalDebtTaken : 0,
+      transactions: sections.transactions ? transactions : [],
+      marketLists: sections.market ? marketLists : [],
+      debtPeople: sections.debt ? debtPeople : [],
+      billPayments,
+      budgets: sections.budget ? budgets : [],
+      sections,
+    };
+  };
 
   // Group expenses by category
   const expenseByCategory: Record<string, number> = {};
@@ -170,6 +175,29 @@ export const ReportPage: React.FC<ReportPageProps> = ({
       console.error('Direct PDF download error:', err);
       setDownloadStatus('⚠️ ব্রাউজারের প্রিন্ট ডায়লগ ওপেন করা হয়েছে');
       printOrSaveAsPdf();
+    } finally {
+      setIsDownloadingPdf(false);
+      setTimeout(() => setDownloadStatus(null), 5000);
+    }
+  };
+
+  // Direct CSV Export with user's selected sections
+  const handleExportSelectiveCsv = async (sections: ReportSectionsSelection) => {
+    setIsOptionsModalOpen(false);
+    setIsDownloadingPdf(true);
+    setDownloadStatus('নির্বাচিত হিসাবের এক্সেল CSV প্রস্তুত হচ্ছে...');
+    try {
+      const data = buildReportData(sections);
+      const fileName = `হিসাব_খাতা_রিপোর্ট_${(activePeriodName || 'চলমান_মাস').replace(/\s+/g, '_')}.csv`;
+      const res = await exportToCSV(data, fileName);
+      if (res.success) {
+        setDownloadStatus('✅ এক্সেল CSV সফলভাবে ডাউনলোড হয়েছে!');
+      } else {
+        setDownloadStatus('⚠️ CSV ডাউনলোড সম্পন্ন হয়নি');
+      }
+    } catch (err) {
+      console.error('CSV export error:', err);
+      setDownloadStatus('⚠️ CSV এক্সপোর্ট সমস্যা হয়েছে');
     } finally {
       setIsDownloadingPdf(false);
       setTimeout(() => setDownloadStatus(null), 5000);
@@ -300,6 +328,7 @@ export const ReportPage: React.FC<ReportPageProps> = ({
         onDownload={handleDownloadSelectivePdf}
         onShare={handleShareSelectivePdf}
         onPrint={handlePrintSelective}
+        onExportCsv={handleExportSelectiveCsv}
       />
 
       {/* Tabs */}

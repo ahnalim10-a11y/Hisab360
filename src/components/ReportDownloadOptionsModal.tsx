@@ -33,6 +33,7 @@ interface ReportDownloadOptionsModalProps {
   onShare: (sections: ReportSectionsSelection) => void;
   onPrint: (sections: ReportSectionsSelection) => void;
   onSaveToDrive?: (sections: ReportSectionsSelection) => void;
+  onExportCsv?: (sections: ReportSectionsSelection) => void;
 }
 
 export const ReportDownloadOptionsModal: React.FC<ReportDownloadOptionsModalProps> = ({
@@ -48,6 +49,7 @@ export const ReportDownloadOptionsModal: React.FC<ReportDownloadOptionsModalProp
   onShare,
   onPrint,
   onSaveToDrive,
+  onExportCsv,
 }) => {
   // Default: All 4 sections selected
   const [sections, setSections] = useState<ReportSectionsSelection>({
@@ -327,6 +329,18 @@ export const ReportDownloadOptionsModal: React.FC<ReportDownloadOptionsModalProp
               <span>{isDownloading ? 'প্রস্তুত হচ্ছে...' : 'PDF ডাউনলোড'}</span>
             </button>
           </div>
+
+          {onExportCsv && (
+            <button
+              type="button"
+              onClick={() => onExportCsv(sections)}
+              disabled={isNoneSelected || isDownloading || isDriveUploading}
+              className="w-full py-2.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+            >
+              <FileText className="w-4 h-4 text-emerald-600" />
+              <span>এক্সেল / CSV ডাটা ডাউনলোড (.csv)</span>
+            </button>
+          )}
 
           <button
             type="button"

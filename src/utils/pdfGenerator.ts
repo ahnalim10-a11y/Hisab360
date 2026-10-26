@@ -52,19 +52,20 @@ export function getOrCreateReportDom(data: ReportData): HTMLElement {
   if (!container) {
     container = document.createElement('div');
     container.id = containerId;
-    container.style.position = 'fixed';
-    container.style.left = '0';
-    container.style.top = '0';
-    container.style.width = '794px'; // Standard A4 width in px at 96 DPI
-    container.style.backgroundColor = '#ffffff';
-    container.style.color = '#0f172a';
-    container.style.fontFamily = "'Hind Siliguri', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-    container.style.zIndex = '-99999';
-    container.style.pointerEvents = 'none';
-    container.style.padding = '36px 32px';
-    container.style.boxSizing = 'border-box';
     document.body.appendChild(container);
   }
+
+  container.style.position = 'absolute';
+  container.style.left = '0';
+  container.style.top = '-99999px';
+  container.style.width = '794px'; // Standard A4 width in px at 96 DPI
+  container.style.backgroundColor = '#ffffff';
+  container.style.color = '#0f172a';
+  container.style.fontFamily = "'Hind Siliguri', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  container.style.zIndex = '999999';
+  container.style.pointerEvents = 'none';
+  container.style.padding = '36px 32px';
+  container.style.boxSizing = 'border-box';
 
   // Active section selections (defaults to true for all if unspecified)
   const sel = data.sections || {
@@ -74,9 +75,30 @@ export function getOrCreateReportDom(data: ReportData): HTMLElement {
     budget: true,
   };
 
+  const selectedCount = Object.values(sel).filter(Boolean).length;
+  let reportTitle = 'হিসাব খাতা - পূর্ণাঙ্গ আর্থিক স্টেটমেন্ট ও সার সংক্ষেপ';
+  let reportSubtitle = 'দৈনন্দিন লেনদেন, বাজার ফর্দ, দেনা-পাওনা ও বাজেট ব্যবস্থাপনার পূর্ণাঙ্গ রিপোর্ট';
+
+  if (selectedCount === 1) {
+    if (sel.transactions) {
+      reportTitle = 'হিসাব খাতা - আয় ও ব্যয়ের হিসাব বিবরণী';
+      reportSubtitle = 'দৈনন্দিন আয় ও খরচের খতিয়ান ও ব্যালেন্স';
+    } else if (sel.market) {
+      reportTitle = 'হিসাব খাতা - বাজার ফর্দ ও খরচের বিবরণী';
+      reportSubtitle = 'বাজার তালিকা, ক্রয়ের বিস্তারিত পণ্যের খতিয়ান ও মোট ব্যয়';
+    } else if (sel.budget) {
+      reportTitle = 'হিসাব খাতা - বাজেট পরিকল্পনা ও ব্যয়ের অগ্রগতি';
+      reportSubtitle = 'মাসিক বাজেট বরাদ্দ ও বর্তমান বাস্তবায়িত খরচের খতিয়ান';
+    } else if (sel.debt) {
+      reportTitle = 'হিসাব খাতা - দেনা-পাওনা ও ঋণের খতিয়ান';
+      reportSubtitle = 'পাওনা (আমি পাবো) ও দেনা (আমি দেবো) হিসাব ও স্থিতি';
+    }
+  }
+
   // Filter incomes and expenses
   const incomes = data.transactions.filter((t) => t.type === 'income');
   const expenses = data.transactions.filter((t) => t.type === 'expense');
+  const transExpTotal = expenses.reduce((s, e) => s + e.amount, 0);
 
   // Market total calculation
   const marketTotal = data.marketLists.reduce((sum, m) => sum + m.total, 0);
@@ -87,113 +109,394 @@ export function getOrCreateReportDom(data: ReportData): HTMLElement {
   // Unique report serial
   const reportSerial = `HK-${Date.now().toString().slice(-6)}`;
 
-  const minRows = 8;
-  const emptyRow = `
-    <tr style="height:19px; background:#ffffff;">
-      <td style="border:1px solid #000000; padding:2px 4px;">&nbsp;</td>
-      <td style="border:1px solid #000000; padding:2px 4px;">&nbsp;</td>
-      <td style="border:1px solid #000000; padding:2px 4px;">&nbsp;</td>
-      <td style="border:1px solid #000000; padding:2px 4px;">&nbsp;</td>
-    </tr>
-  `;
+  // 1. Transactions Rows (Income & Expense) - Render exact user inputs without fake empty rows
+  const transRows = data.transactions.length > 0
+    ? data.transactions
+        .map((t) => `
+          <tr style="border-bottom:1px solid #000000; background:#ffffff;">
+            <td style="border:1px solid #000000; padding:4px 6px; text-align:center; color:#334155; font-size:10px; white-space:nowrap;">${t.date}</td>
+            <td style="border:1px solid #000000; padding:4px 6px; font-weight:700; color:#0f172a; font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              <span style="font-size:9px; color:${t.type === 'income' ? '#15803d' : '#b91c1c'}; font-weight:800;">[${t.type === 'income' ? 'আয়' : 'ব্যয়'}]</span> ${t.category}
+            </td>
+            <td style="border:1px solid #000000; padding:4px 6px; color:#475569; font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${t.desc || '-'}</td>
+            <td style="border:1px solid #000000; padding:4px 6px; text-align:right; font-weight:800; font-size:10px; color:${t.type === 'income' ? '#15803d' : '#b91c1c'}; white-space:nowrap;">
+              ${t.type === 'income' ? '+' : '-'}${formatMoney(t.amount)}
+            </td>
+          </tr>
+        `)
+        .join('')
+    : `<tr><td colspan="4" style="border:1px solid #000000; padding:10px; text-align:center; color:#94a3b8; font-size:10.5px;">কোনো আয়-ব্যয় হিসাব ইনপুট করা হয়নি</td></tr>`;
 
-  // 1. Transactions Rows (Income & Expense)
-  let transRows = data.transactions
-    .map((t) => `
-      <tr style="border-bottom:1px solid #000000; background:#ffffff;">
-        <td style="border:1px solid #000000; padding:3px 4px; text-align:center; color:#334155; font-size:9.5px; white-space:nowrap;">${t.date}</td>
-        <td style="border:1px solid #000000; padding:3px 4px; font-weight:700; color:#0f172a; font-size:9.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-          <span style="font-size:8.5px; color:${t.type === 'income' ? '#15803d' : '#b91c1c'}; font-weight:800;">[${t.type === 'income' ? 'আয়' : 'ব্যয়'}]</span> ${t.category}
-        </td>
-        <td style="border:1px solid #000000; padding:3px 4px; color:#475569; font-size:9.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${t.desc || '-'}</td>
-        <td style="border:1px solid #000000; padding:3px 4px; text-align:right; font-weight:800; font-size:9.5px; color:${t.type === 'income' ? '#15803d' : '#b91c1c'}; white-space:nowrap;">
-          ${t.type === 'income' ? '+' : '-'}${formatMoney(t.amount)}
-        </td>
-      </tr>
-    `)
-    .join('');
-  const transCount = data.transactions.length;
-  for (let i = transCount; i < minRows; i++) {
-    transRows += emptyRow;
+  // 2. Market Rows (বাজার ফর্দ) - Render exact user inputs
+  const marketRows = data.marketLists.length > 0
+    ? data.marketLists
+        .map((m) => {
+          const itemsText = m.items && m.items.length > 0
+            ? m.items.map((i) => `${i.name} (${formatMoney(i.price)})`).join(', ')
+            : 'বাজার পণ্য';
+          return `
+            <tr style="border-bottom:1px solid #000000; background:#ffffff;">
+              <td style="border:1px solid #000000; padding:4px 6px; text-align:center; color:#334155; font-size:10px; white-space:nowrap;">${m.date}</td>
+              <td style="border:1px solid #000000; padding:4px 6px; font-weight:700; color:#0f172a; font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${m.shop || 'বাজার'}</td>
+              <td style="border:1px solid #000000; padding:4px 6px; color:#475569; font-size:9.5px; overflow:hidden; text-overflow:ellipsis;">${itemsText}</td>
+              <td style="border:1px solid #000000; padding:4px 6px; text-align:right; font-weight:800; font-size:10px; color:#b45309; white-space:nowrap;">-${formatMoney(m.total)}</td>
+            </tr>
+          `;
+        })
+        .join('')
+    : `<tr><td colspan="4" style="border:1px solid #000000; padding:10px; text-align:center; color:#94a3b8; font-size:10.5px;">কোনো বাজার তালিকা ইনপুট করা হয়নি</td></tr>`;
+
+  // 3. Budget Rows (বাজেট) - Render exact user inputs
+  const budgetRows = data.budgets.length > 0
+    ? data.budgets
+        .map((b) => {
+          let spent = 0;
+          if (b.target === 'expense_total') {
+            spent = data.totalExpense;
+          } else if (b.target === 'market_general') {
+            spent = marketTotal;
+          } else if (b.target.startsWith('shop_')) {
+            const sName = b.target.replace('shop_', '');
+            spent = data.marketLists.filter((m) => m.shop === sName).reduce((sum, m) => sum + m.total, 0);
+          }
+          const isExceeded = spent > b.amount;
+          return `
+            <tr style="border-bottom:1px solid #000000; background:#ffffff;">
+              <td style="border:1px solid #000000; padding:4px 6px; text-align:center; color:#334155; font-size:10px; white-space:nowrap;">${b.status === 'completed' ? 'সম্পন্ন' : 'চলমান'}</td>
+              <td style="border:1px solid #000000; padding:4px 6px; font-weight:700; color:#0f172a; font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${b.name}</td>
+              <td style="border:1px solid #000000; padding:4px 6px; font-size:9.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:${isExceeded ? '#b91c1c' : '#15803d'};">
+                খরচ: ${formatMoney(spent)} (${isExceeded ? 'অতিক্রম' : 'সঠিক'})
+              </td>
+              <td style="border:1px solid #000000; padding:4px 6px; text-align:right; font-weight:800; font-size:10px; color:#6d28d9; white-space:nowrap;">${formatMoney(b.amount)}</td>
+            </tr>
+          `;
+        })
+        .join('')
+    : `<tr><td colspan="4" style="border:1px solid #000000; padding:10px; text-align:center; color:#94a3b8; font-size:10.5px;">কোনো বাজেট রেকর্ড ইনপুট করা হয়নি</td></tr>`;
+
+  // 4. Debt Rows (দেনা-পাওনা) - Render exact user inputs
+  const debtRows = data.debtPeople.length > 0
+    ? data.debtPeople
+        .map((p) => `
+          <tr style="border-bottom:1px solid #000000; background:#ffffff;">
+            <td style="border:1px solid #000000; padding:4px 6px; text-align:center; color:#334155; font-size:10px; white-space:nowrap;">${p.dir === 'give' ? 'পাওনা' : 'দেনা'}</td>
+            <td style="border:1px solid #000000; padding:4px 6px; font-weight:700; font-size:10px; white-space:nowrap; color:${p.dir === 'give' ? '#15803d' : '#b91c1c'};">
+              ${p.dir === 'give' ? 'আমি পাবো' : 'সে পাবে'}
+            </td>
+            <td style="border:1px solid #000000; padding:4px 6px; font-weight:600; color:#0f172a; font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              ${p.name}${p.addr ? ` (${p.addr})` : ''}
+            </td>
+            <td style="border:1px solid #000000; padding:4px 6px; text-align:right; font-weight:800; font-size:10px; color:${p.dir === 'give' ? '#15803d' : '#b91c1c'}; white-space:nowrap;">
+              ${formatMoney(p.amount)}
+            </td>
+          </tr>
+        `)
+        .join('')
+    : `<tr><td colspan="4" style="border:1px solid #000000; padding:10px; text-align:center; color:#94a3b8; font-size:10.5px;">কোনো দেনা-পাওনা হিসাব ইনপুট করা হয়নি</td></tr>`;
+
+  // Selectively build user chosen tables
+  const activeTableCards: string[] = [];
+
+  if (sel.transactions) {
+    activeTableCards.push(`
+      <div style="border:1.5px solid #000000; background:#ffffff; box-sizing:border-box; margin-bottom:10px;">
+        <div style="background:#ffe600; color:#000000; font-weight:800; text-align:center; padding:6px; font-size:12px; border-bottom:1.5px solid #000000; letter-spacing:0.2px;">
+          আয় ও ব্যয়ের তালিকা (${bnNum(data.transactions.length)} টি এন্ট্রি)
+        </div>
+        <table style="width:100%; border-collapse:collapse; font-size:9.5px; table-layout:fixed;">
+          <thead>
+            <tr style="background:#f8fafc; font-weight:700; color:#000000; text-align:center;">
+              <th style="border:1px solid #000000; padding:4px 2px; width:22%;">তারিখ</th>
+              <th style="border:1px solid #000000; padding:4px 2px; width:26%;">ক্যাটাগরি</th>
+              <th style="border:1px solid #000000; padding:4px 2px; width:30%;">বিবরণ</th>
+              <th style="border:1px solid #000000; padding:4px 2px; width:22%; text-align:right;">পরিমাণ</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${transRows}
+          </tbody>
+          <tfoot>
+            <tr style="background:#fef9c3; font-weight:800; font-size:10px;">
+              <td colspan="3" style="border:1px solid #000000; padding:4px 6px; text-align:right;">মোট আয়: +${formatMoney(data.totalIncome)} | মোট ব্যয়:</td>
+              <td style="border:1px solid #000000; padding:4px 6px; text-align:right; color:#b91c1c;">-${formatMoney(transExpTotal)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `);
   }
 
-  // 2. Market Rows (বাজার ফর্দ)
-  let marketRows = data.marketLists
-    .map((m) => {
-      const itemsText = m.items && m.items.length > 0
-        ? m.items.map((i) => i.name).slice(0, 3).join(', ') + (m.items.length > 3 ? '...' : '')
-        : 'বাজার পণ্য';
-      return `
-        <tr style="border-bottom:1px solid #000000; background:#ffffff;">
-          <td style="border:1px solid #000000; padding:3px 4px; text-align:center; color:#334155; font-size:9.5px; white-space:nowrap;">${m.date}</td>
-          <td style="border:1px solid #000000; padding:3px 4px; font-weight:700; color:#0f172a; font-size:9.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${m.shop || 'বাজার'}</td>
-          <td style="border:1px solid #000000; padding:3px 4px; color:#475569; font-size:9.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${itemsText}</td>
-          <td style="border:1px solid #000000; padding:3px 4px; text-align:right; font-weight:800; font-size:9.5px; color:#b45309; white-space:nowrap;">-${formatMoney(m.total)}</td>
-        </tr>
+  if (sel.market) {
+    activeTableCards.push(`
+      <div style="border:1.5px solid #000000; background:#ffffff; box-sizing:border-box; margin-bottom:10px;">
+        <div style="background:#ffe600; color:#000000; font-weight:800; text-align:center; padding:6px; font-size:12px; border-bottom:1.5px solid #000000; letter-spacing:0.2px;">
+          বাজার ফর্দ ও ক্রয়ের তালিকা (${bnNum(data.marketLists.length)} টি ফর্দ)
+        </div>
+        <table style="width:100%; border-collapse:collapse; font-size:9.5px; table-layout:fixed;">
+          <thead>
+            <tr style="background:#f8fafc; font-weight:700; color:#000000; text-align:center;">
+              <th style="border:1px solid #000000; padding:4px 2px; width:20%;">তারিখ</th>
+              <th style="border:1px solid #000000; padding:4px 2px; width:24%;">দোকান/খাত</th>
+              <th style="border:1px solid #000000; padding:4px 2px; width:34%;">পণ্যের বিবরণ ও দাম</th>
+              <th style="border:1px solid #000000; padding:4px 2px; width:22%; text-align:right;">মোট খরচ</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${marketRows}
+          </tbody>
+          <tfoot>
+            <tr style="background:#fef9c3; font-weight:800; font-size:10px;">
+              <td colspan="3" style="border:1px solid #000000; padding:4px 6px; text-align:right;">সর্বমোট বাজার খরচ:</td>
+              <td style="border:1px solid #000000; padding:4px 6px; text-align:right; color:#b45309;">-${formatMoney(marketTotal)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `);
+  }
+
+  if (sel.budget) {
+    activeTableCards.push(`
+      <div style="border:1.5px solid #000000; background:#ffffff; box-sizing:border-box; margin-bottom:10px;">
+        <div style="background:#ffe600; color:#000000; font-weight:800; text-align:center; padding:6px; font-size:12px; border-bottom:1.5px solid #000000; letter-spacing:0.2px;">
+          বাজেট ব্যবস্থাপনা ও অগ্রগতি (${bnNum(data.budgets.length)} টি বাজেট)
+        </div>
+        <table style="width:100%; border-collapse:collapse; font-size:9.5px; table-layout:fixed;">
+          <thead>
+            <tr style="background:#f8fafc; font-weight:700; color:#000000; text-align:center;">
+              <th style="border:1px solid #000000; padding:4px 2px; width:20%;">অবস্থা</th>
+              <th style="border:1px solid #000000; padding:4px 2px; width:28%;">বাজেট নাম</th>
+              <th style="border:1px solid #000000; padding:4px 2px; width:30%;">খরচ বিবরণ</th>
+              <th style="border:1px solid #000000; padding:4px 2px; width:22%; text-align:right;">বরাদ্দ সীমা</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${budgetRows}
+          </tbody>
+          <tfoot>
+            <tr style="background:#fef9c3; font-weight:800; font-size:10px;">
+              <td colspan="3" style="border:1px solid #000000; padding:4px 6px; text-align:right;">মোট বাজেট বরাদ্দ:</td>
+              <td style="border:1px solid #000000; padding:4px 6px; text-align:right; color:#6d28d9;">${formatMoney(totalBudgetAmount)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `);
+  }
+
+  if (sel.debt) {
+    activeTableCards.push(`
+      <div style="border:1.5px solid #000000; background:#ffffff; box-sizing:border-box; margin-bottom:10px;">
+        <div style="background:#ffe600; color:#000000; font-weight:800; text-align:center; padding:6px; font-size:12px; border-bottom:1.5px solid #000000; letter-spacing:0.2px;">
+          দেনা-পাওনা ও ঋণের হিসাব (${bnNum(data.debtPeople.length)} জন)
+        </div>
+        <table style="width:100%; border-collapse:collapse; font-size:9.5px; table-layout:fixed;">
+          <thead>
+            <tr style="background:#f8fafc; font-weight:700; color:#000000; text-align:center;">
+              <th style="border:1px solid #000000; padding:4px 2px; width:18%;">খাত</th>
+              <th style="border:1px solid #000000; padding:4px 2px; width:24%;">ধরন</th>
+              <th style="border:1px solid #000000; padding:4px 2px; width:36%;">ব্যক্তি/প্রতিষ্ঠান</th>
+              <th style="border:1px solid #000000; padding:4px 2px; width:22%; text-align:right;">পরিমাণ</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${debtRows}
+          </tbody>
+          <tfoot>
+            <tr style="background:#fef9c3; font-weight:800; font-size:10px;">
+              <td colspan="3" style="border:1px solid #000000; padding:4px 6px; text-align:right;">পাওনা: +${formatMoney(data.totalDebtGiven)} | দেনা:</td>
+              <td style="border:1px solid #000000; padding:4px 6px; text-align:right; color:#b91c1c;">-${formatMoney(data.totalDebtTaken)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `);
+  }
+
+  const gridHtml = activeTableCards.length === 1
+    ? `<div style="margin-bottom:12px;">${activeTableCards[0]}</div>`
+    : `<div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">${activeTableCards.join('')}</div>`;
+
+  // Calculated summary based on user selections
+  const effectiveIncome = sel.transactions ? data.totalIncome : 0;
+  const effectiveExpense = (sel.transactions ? transExpTotal : 0) + (sel.market ? marketTotal : 0);
+  const effectiveSavings = effectiveIncome - effectiveExpense;
+  const effectiveDebtGiven = sel.debt ? data.totalDebtGiven : 0;
+  const effectiveDebtTaken = sel.debt ? data.totalDebtTaken : 0;
+
+  // Build tailored Summary Table according to selected sections
+  let summaryCardHtml = '';
+
+  if (selectedCount === 1) {
+    if (sel.transactions) {
+      summaryCardHtml = `
+        <div style="border:1.5px solid #000000; background:#ffffff; box-sizing:border-box;">
+          <div style="background:#ffffff; color:#000000; font-weight:800; text-align:center; padding:6px; font-size:12px; border-bottom:1.5px solid #000000;">
+            আয় ও ব্যয়ের সার সংক্ষেপ
+          </div>
+          <table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; table-layout:fixed;">
+            <thead>
+              <tr style="font-weight:800;">
+                <th style="border:1px solid #000000; background:#ffe600; padding:6px; width:33.33%; color:#000000;">মোট আয়</th>
+                <th style="border:1px solid #000000; background:#fca5a5; padding:6px; width:33.33%; color:#000000;">মোট ব্যয়</th>
+                <th style="border:1px solid #000000; background:#86efac; padding:6px; width:33.33%; color:#000000;">নিট স্থিতি (ব্যালেন্স)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="font-weight:800; font-size:13px; background:#ffffff;">
+                <td style="border:1px solid #000000; padding:8px; color:#15803d;">+${formatMoney(effectiveIncome)}</td>
+                <td style="border:1px solid #000000; padding:8px; color:#b91c1c;">-${formatMoney(transExpTotal)}</td>
+                <td style="border:1px solid #000000; padding:8px; color:${effectiveIncome - transExpTotal >= 0 ? '#15803d' : '#b91c1c'};">
+                  ${effectiveIncome - transExpTotal >= 0 ? '+' : ''}${formatMoney(effectiveIncome - transExpTotal)}
+                </td>
+              </tr>
+              <tr style="font-size:10px; background:#ffffff; color:#475569;">
+                <td style="border:1px solid #000000; padding:4px;">${bnNum(incomes.length)} টি আয়ের খাত</td>
+                <td style="border:1px solid #000000; padding:4px;">${bnNum(expenses.length)} টি ব্যয়ের খাত</td>
+                <td style="border:1px solid #000000; padding:4px; font-weight:700;">
+                  ${effectiveIncome - transExpTotal >= 0 ? '✓ উদ্বৃত্ত ব্যালেন্স' : '✕ ঘাটতি'}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       `;
-    })
-    .join('');
-  const marketCount = data.marketLists.length;
-  for (let i = marketCount; i < minRows; i++) {
-    marketRows += emptyRow;
-  }
-
-  // 3. Budget Rows (বাজেট)
-  let budgetRows = data.budgets
-    .map((b) => {
-      let spent = 0;
-      if (b.target === 'expense_total') {
-        spent = data.totalExpense;
-      } else if (b.target === 'market_general') {
-        spent = marketTotal;
-      } else if (b.target.startsWith('shop_')) {
-        const sName = b.target.replace('shop_', '');
-        spent = data.marketLists.filter((m) => m.shop === sName).reduce((sum, m) => sum + m.total, 0);
-      }
-      const isExceeded = spent > b.amount;
-      return `
-        <tr style="border-bottom:1px solid #000000; background:#ffffff;">
-          <td style="border:1px solid #000000; padding:3px 4px; text-align:center; color:#334155; font-size:9.5px; white-space:nowrap;">চলমান</td>
-          <td style="border:1px solid #000000; padding:3px 4px; font-weight:700; color:#0f172a; font-size:9.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${b.name}</td>
-          <td style="border:1px solid #000000; padding:3px 4px; font-size:9.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:${isExceeded ? '#b91c1c' : '#15803d'};">
-            খরচ: ${formatMoney(spent)} (${isExceeded ? 'অতিক্রম' : 'সঠিক'})
-          </td>
-          <td style="border:1px solid #000000; padding:3px 4px; text-align:right; font-weight:800; font-size:9.5px; color:#6d28d9; white-space:nowrap;">${formatMoney(b.amount)}</td>
-        </tr>
+    } else if (sel.market) {
+      summaryCardHtml = `
+        <div style="border:1.5px solid #000000; background:#ffffff; box-sizing:border-box;">
+          <div style="background:#ffffff; color:#000000; font-weight:800; text-align:center; padding:6px; font-size:12px; border-bottom:1.5px solid #000000;">
+            বাজার খরচের সার সংক্ষেপ
+          </div>
+          <table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; table-layout:fixed;">
+            <thead>
+              <tr style="font-weight:800;">
+                <th style="border:1px solid #000000; background:#ffe600; padding:6px; width:33.33%; color:#000000;">মোট বাজার ফর্দ</th>
+                <th style="border:1px solid #000000; background:#fca5a5; padding:6px; width:33.33%; color:#000000;">সর্বমোট বাজার ব্যয়</th>
+                <th style="border:1px solid #000000; background:#86efac; padding:6px; width:33.33%; color:#000000;">পণ্য ও আইটেম</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="font-weight:800; font-size:13px; background:#ffffff;">
+                <td style="border:1px solid #000000; padding:8px; color:#0f172a;">${bnNum(data.marketLists.length)} টি ফর্দ</td>
+                <td style="border:1px solid #000000; padding:8px; color:#b91c1c;">-${formatMoney(marketTotal)}</td>
+                <td style="border:1px solid #000000; padding:8px; color:#15803d;">
+                  ${bnNum(data.marketLists.reduce((acc, m) => acc + (m.items ? m.items.length : 0), 0))} টি মোট আইটেম
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       `;
-    })
-    .join('');
-  const budgetCount = data.budgets.length;
-  for (let i = budgetCount; i < minRows; i++) {
-    budgetRows += emptyRow;
-  }
-
-  // 4. Debt Rows (দেনা-পাওনা)
-  let debtRows = data.debtPeople
-    .map((p) => `
-      <tr style="border-bottom:1px solid #000000; background:#ffffff;">
-        <td style="border:1px solid #000000; padding:3px 4px; text-align:center; color:#334155; font-size:9.5px; white-space:nowrap;">হিসাব</td>
-        <td style="border:1px solid #000000; padding:3px 4px; font-weight:700; font-size:9.5px; white-space:nowrap; color:${p.dir === 'give' ? '#15803d' : '#b91c1c'};">
-          ${p.dir === 'give' ? 'পাওনা (পাবো)' : 'দেনা (দেবো)'}
-        </td>
-        <td style="border:1px solid #000000; padding:3px 4px; font-weight:600; color:#0f172a; font-size:9.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-          ${p.name}${p.addr ? ` (${p.addr})` : ''}
-        </td>
-        <td style="border:1px solid #000000; padding:3px 4px; text-align:right; font-weight:800; font-size:9.5px; color:${p.dir === 'give' ? '#15803d' : '#b91c1c'}; white-space:nowrap;">
-          ${formatMoney(p.amount)}
-        </td>
-      </tr>
-    `)
-    .join('');
-  const debtCount = data.debtPeople.length;
-  for (let i = debtCount; i < minRows; i++) {
-    debtRows += emptyRow;
+    } else if (sel.budget) {
+      summaryCardHtml = `
+        <div style="border:1.5px solid #000000; background:#ffffff; box-sizing:border-box;">
+          <div style="background:#ffffff; color:#000000; font-weight:800; text-align:center; padding:6px; font-size:12px; border-bottom:1.5px solid #000000;">
+            বাজেট বাস্তবায়নের সার সংক্ষেপ
+          </div>
+          <table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; table-layout:fixed;">
+            <thead>
+              <tr style="font-weight:800;">
+                <th style="border:1px solid #000000; background:#ffe600; padding:6px; width:33.33%; color:#000000;">মোট বাজেট সীমা</th>
+                <th style="border:1px solid #000000; background:#fed7aa; padding:6px; width:33.33%; color:#000000;">সক্রিয় বাজেট সংখ্যা</th>
+                <th style="border:1px solid #000000; background:#86efac; padding:6px; width:33.33%; color:#000000;">সম্পন্ন বাজেট</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="font-weight:800; font-size:13px; background:#ffffff;">
+                <td style="border:1px solid #000000; padding:8px; color:#6d28d9;">${formatMoney(totalBudgetAmount)}</td>
+                <td style="border:1px solid #000000; padding:8px; color:#0f172a;">${bnNum(data.budgets.filter(b => b.status !== 'completed').length)} টি</td>
+                <td style="border:1px solid #000000; padding:8px; color:#15803d;">${bnNum(data.budgets.filter(b => b.status === 'completed').length)} টি</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+    } else if (sel.debt) {
+      summaryCardHtml = `
+        <div style="border:1.5px solid #000000; background:#ffffff; box-sizing:border-box;">
+          <div style="background:#ffffff; color:#000000; font-weight:800; text-align:center; padding:6px; font-size:12px; border-bottom:1.5px solid #000000;">
+            দেনা-পাওনা সার সংক্ষেপ
+          </div>
+          <table style="width:100%; border-collapse:collapse; font-size:11px; text-align:center; table-layout:fixed;">
+            <thead>
+              <tr style="font-weight:800;">
+                <th style="border:1px solid #000000; background:#86efac; padding:6px; width:33.33%; color:#000000;">মোট পাওনা (আমি পাবো)</th>
+                <th style="border:1px solid #000000; background:#fca5a5; padding:6px; width:33.33%; color:#000000;">মোট দেনা (সে পাবে)</th>
+                <th style="border:1px solid #000000; background:#ffe600; padding:6px; width:33.33%; color:#000000;">নিট পাওনা/দেনা স্থিতি</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="font-weight:800; font-size:13px; background:#ffffff;">
+                <td style="border:1px solid #000000; padding:8px; color:#15803d;">+${formatMoney(effectiveDebtGiven)}</td>
+                <td style="border:1px solid #000000; padding:8px; color:#b91c1c;">-${formatMoney(effectiveDebtTaken)}</td>
+                <td style="border:1px solid #000000; padding:8px; color:${effectiveDebtGiven - effectiveDebtTaken >= 0 ? '#15803d' : '#b91c1c'};">
+                  ${formatMoney(Math.abs(effectiveDebtGiven - effectiveDebtTaken))} (${effectiveDebtGiven >= effectiveDebtTaken ? 'উদ্বৃত্ত পাওনা' : 'দেনা রয়েছে'})
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+  } else {
+    // Multi-section executive summary (Default / Report Page)
+    summaryCardHtml = `
+      <div style="border:1.5px solid #000000; background:#ffffff; box-sizing:border-box;">
+        <div style="background:#ffffff; color:#000000; font-weight:800; text-align:center; padding:5px; font-size:12px; border-bottom:1.5px solid #000000;">
+          সার সংক্ষেপ
+        </div>
+        <table style="width:100%; border-collapse:collapse; font-size:10.5px; text-align:center; table-layout:fixed;">
+          <thead>
+            <tr style="font-weight:800; font-size:11px;">
+              <th style="border:1px solid #000000; background:#ffe600; padding:5px 6px; width:25%; color:#000000;">আয়</th>
+              <th style="border:1px solid #000000; background:#fca5a5; padding:5px 6px; width:25%; color:#000000;">ব্যয়</th>
+              <th style="border:1px solid #000000; background:#fed7aa; padding:5px 6px; width:25%; color:#000000;">দেনা-পাওনা</th>
+              <th style="border:1px solid #000000; background:#86efac; padding:5px 6px; width:25%; color:#000000;">সঞ্চয়</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="font-weight:800; font-size:12px; background:#ffffff;">
+              <td style="border:1px solid #000000; padding:6px 6px; color:#15803d;">
+                +${formatMoney(effectiveIncome)}
+              </td>
+              <td style="border:1px solid #000000; padding:6px 6px; color:#b91c1c;">
+                -${formatMoney(effectiveExpense)}
+              </td>
+              <td style="border:1px solid #000000; padding:6px 6px; color:#0f172a; font-size:10px;">
+                পাওনা: <span style="color:#15803d;">${formatMoney(effectiveDebtGiven)}</span><br/>
+                দেনা: <span style="color:#b91c1c;">${formatMoney(effectiveDebtTaken)}</span>
+              </td>
+              <td style="border:1px solid #000000; padding:6px 6px; color:${effectiveSavings >= 0 ? '#15803d' : '#b91c1c'};">
+                ${effectiveSavings >= 0 ? '+' : ''}${formatMoney(effectiveSavings)}
+              </td>
+            </tr>
+            <tr style="font-size:9.5px; background:#ffffff; color:#334155;">
+              <td style="border:1px solid #000000; padding:4px 5px;">
+                ${sel.transactions ? `মোট ${bnNum(incomes.length)} টি আয়ের খাত` : '-'}
+              </td>
+              <td style="border:1px solid #000000; padding:4px 5px;">
+                ${sel.transactions ? `সাধারণ: ${formatMoney(transExpTotal)}` : ''}
+                ${sel.transactions && sel.market ? '<br/>' : ''}
+                ${sel.market ? `বাজার: ${formatMoney(marketTotal)}` : ''}
+                ${!sel.transactions && !sel.market ? '-' : ''}
+              </td>
+              <td style="border:1px solid #000000; padding:4px 5px;">
+                ${sel.debt ? `নিট স্থিতি: <strong style="color:${(effectiveDebtGiven - effectiveDebtTaken) >= 0 ? '#15803d' : '#b91c1c'}">${formatMoney(effectiveDebtGiven - effectiveDebtTaken)}</strong>` : '-'}
+              </td>
+              <td style="border:1px solid #000000; padding:4px 5px; font-weight:700; color:${effectiveSavings >= 0 ? '#15803d' : '#b91c1c'};">
+                ${effectiveSavings >= 0 ? '✓ নিট উদ্বৃত্ত সঞ্চয়' : '✕ ঘাটতি'}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
   }
 
   container.innerHTML = `
     <div style="background:#ffffff; color:#0f172a; font-family:'Hind Siliguri', sans-serif; line-height:1.4; max-width:730px; margin:0 auto;">
       
-      <!-- TOP EXECUTIVE BRANDING HEADER (User's System Top) -->
+      <!-- TOP EXECUTIVE BRANDING HEADER -->
       <div style="background:linear-gradient(135deg, #064e3b 0%, #047857 50%, #0f766e 100%); color:#ffffff; border-radius:16px; padding:18px 22px; margin-bottom:16px; box-shadow:0 4px 10px rgba(6,78,59,0.12);">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <div>
@@ -202,13 +505,13 @@ export function getOrCreateReportDom(data: ReportData): HTMLElement {
               <span>অফিসিয়াল আর্থিক হিসাব ও নিরীক্ষা প্রতিবেদন</span>
             </div>
             <h1 style="font-size:22px; font-weight:800; color:#ffffff; margin:0 0 2px 0; letter-spacing:-0.3px;">
-              হিসাব খাতা - আর্থিক স্টেটমেন্ট
+              ${reportTitle}
             </h1>
             <div style="font-size:13px; color:#fef08a; margin:2px 0 0 0; font-weight:700;">
               সময়কাল : ${data.periodName}
             </div>
             <p style="font-size:11px; color:#d1fae5; margin:3px 0 0 0; font-weight:500;">
-              দৈনন্দিন লেনদেন, বাজার ফর্দ, দেনা-পাওনা ও বাজেট ব্যবস্থাপনার পূর্ণাঙ্গ রিপোর্ট
+              ${reportSubtitle}
             </p>
           </div>
 
@@ -247,184 +550,11 @@ export function getOrCreateReportDom(data: ReportData): HTMLElement {
         </div>
       </div>
 
-      <!-- MIDDLE EXCEL SHEET SECTION (Exact design like user's spreadsheet template) -->
+      <!-- MIDDLE TABLES -->
       <div style="margin-bottom:14px;">
-        
-        <!-- 2x2 Grid of Excel Tables -->
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
-          
-          <!-- TABLE 1: আয়-ব্যয় -->
-          <div style="border:1.5px solid #000000; background:#ffffff; box-sizing:border-box;">
-            <div style="background:#ffe600; color:#000000; font-weight:800; text-align:center; padding:5px; font-size:12px; border-bottom:1.5px solid #000000; letter-spacing:0.2px;">
-              আয়-ব্যয়
-            </div>
-            <table style="width:100%; border-collapse:collapse; font-size:9.5px; table-layout:fixed;">
-              <thead>
-                <tr style="background:#ffffff; font-weight:700; color:#000000; text-align:center;">
-                  <th style="border:1px solid #000000; padding:3px 2px; width:22%;">তারিখ</th>
-                  <th style="border:1px solid #000000; padding:3px 2px; width:26%;">ক্যাটাগরি</th>
-                  <th style="border:1px solid #000000; padding:3px 2px; width:30%;">বিবরণ</th>
-                  <th style="border:1px solid #000000; padding:3px 2px; width:22%; text-align:right;">পরিমাণ</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${transRows}
-              </tbody>
-              <tfoot>
-                <tr style="background:#fef9c3; font-weight:800; font-size:9.5px;">
-                  <td colspan="3" style="border:1px solid #000000; padding:3px 5px; text-align:right;">আয়: +${formatMoney(data.totalIncome)} | ব্যয়:</td>
-                  <td style="border:1px solid #000000; padding:3px 5px; text-align:right; color:#b91c1c;">-${formatMoney(data.totalExpense)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-          <!-- TABLE 2: বাজার ফর্দ -->
-          <div style="border:1.5px solid #000000; background:#ffffff; box-sizing:border-box;">
-            <div style="background:#ffe600; color:#000000; font-weight:800; text-align:center; padding:5px; font-size:12px; border-bottom:1.5px solid #000000; letter-spacing:0.2px;">
-              বাজার ফর্দ
-            </div>
-            <table style="width:100%; border-collapse:collapse; font-size:9.5px; table-layout:fixed;">
-              <thead>
-                <tr style="background:#ffffff; font-weight:700; color:#000000; text-align:center;">
-                  <th style="border:1px solid #000000; padding:3px 2px; width:22%;">তারিখ</th>
-                  <th style="border:1px solid #000000; padding:3px 2px; width:26%;">ক্যাটাগরি</th>
-                  <th style="border:1px solid #000000; padding:3px 2px; width:30%;">বিবরণ</th>
-                  <th style="border:1px solid #000000; padding:3px 2px; width:22%; text-align:right;">পরিমাণ</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${marketRows}
-              </tbody>
-              <tfoot>
-                <tr style="background:#fef9c3; font-weight:800; font-size:9.5px;">
-                  <td colspan="3" style="border:1px solid #000000; padding:3px 5px; text-align:right;">সর্বমোট বাজার:</td>
-                  <td style="border:1px solid #000000; padding:3px 5px; text-align:right; color:#b45309;">-${formatMoney(marketTotal)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-          <!-- TABLE 3: বাজেট -->
-          <div style="border:1.5px solid #000000; background:#ffffff; box-sizing:border-box;">
-            <div style="background:#ffe600; color:#000000; font-weight:800; text-align:center; padding:5px; font-size:12px; border-bottom:1.5px solid #000000; letter-spacing:0.2px;">
-              বাজেট
-            </div>
-            <table style="width:100%; border-collapse:collapse; font-size:9.5px; table-layout:fixed;">
-              <thead>
-                <tr style="background:#ffffff; font-weight:700; color:#000000; text-align:center;">
-                  <th style="border:1px solid #000000; padding:3px 2px; width:22%;">তারিখ</th>
-                  <th style="border:1px solid #000000; padding:3px 2px; width:26%;">ক্যাটাগরি</th>
-                  <th style="border:1px solid #000000; padding:3px 2px; width:30%;">বিবরণ</th>
-                  <th style="border:1px solid #000000; padding:3px 2px; width:22%; text-align:right;">পরিমাণ</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${budgetRows}
-              </tbody>
-              <tfoot>
-                <tr style="background:#fef9c3; font-weight:800; font-size:9.5px;">
-                  <td colspan="3" style="border:1px solid #000000; padding:3px 5px; text-align:right;">মোট বাজেট বরাদ্দ:</td>
-                  <td style="border:1px solid #000000; padding:3px 5px; text-align:right; color:#6d28d9;">${formatMoney(totalBudgetAmount)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-          <!-- TABLE 4: দেনা-পাওনা -->
-          <div style="border:1.5px solid #000000; background:#ffffff; box-sizing:border-box;">
-            <div style="background:#ffe600; color:#000000; font-weight:800; text-align:center; padding:5px; font-size:12px; border-bottom:1.5px solid #000000; letter-spacing:0.2px;">
-              দেনা-পাওনা
-            </div>
-            <table style="width:100%; border-collapse:collapse; font-size:9.5px; table-layout:fixed;">
-              <thead>
-                <tr style="background:#ffffff; font-weight:700; color:#000000; text-align:center;">
-                  <th style="border:1px solid #000000; padding:3px 2px; width:22%;">তারিখ</th>
-                  <th style="border:1px solid #000000; padding:3px 2px; width:26%;">ক্যাটাগরি</th>
-                  <th style="border:1px solid #000000; padding:3px 2px; width:30%;">বিবরণ</th>
-                  <th style="border:1px solid #000000; padding:3px 2px; width:22%; text-align:right;">পরিমাণ</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${debtRows}
-              </tbody>
-              <tfoot>
-                <tr style="background:#fef9c3; font-weight:800; font-size:9.5px;">
-                  <td colspan="3" style="border:1px solid #000000; padding:3px 5px; text-align:right;">পাওনা: ${formatMoney(data.totalDebtGiven)} | দেনা:</td>
-                  <td style="border:1px solid #000000; padding:3px 5px; text-align:right; color:#b91c1c;">-${formatMoney(data.totalDebtTaken)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-
-        </div>
-
-        <!-- TABLE 5: সার সংক্ষেপ (Wide Excel summary table with user's colored headers) -->
-        <div style="border:1.5px solid #000000; background:#ffffff; box-sizing:border-box;">
-          <div style="background:#ffffff; color:#000000; font-weight:800; text-align:center; padding:5px; font-size:12px; border-bottom:1.5px solid #000000;">
-            সার সংক্ষেপ
-          </div>
-          <table style="width:100%; border-collapse:collapse; font-size:10.5px; text-align:center; table-layout:fixed;">
-            <thead>
-              <tr style="font-weight:800; font-size:11px;">
-                <th style="border:1px solid #000000; background:#ffe600; padding:5px 6px; width:25%; color:#000000;">আয়</th>
-                <th style="border:1px solid #000000; background:#fca5a5; padding:5px 6px; width:25%; color:#000000;">ব্যয়</th>
-                <th style="border:1px solid #000000; background:#fed7aa; padding:5px 6px; width:25%; color:#000000;">দেনা-পাওনা</th>
-                <th style="border:1px solid #000000; background:#86efac; padding:5px 6px; width:25%; color:#000000;">সঞ্চয়</th>
-              </tr>
-            </thead>
-            <tbody>
-              <!-- Row 1: Amounts -->
-              <tr style="font-weight:800; font-size:12px; background:#ffffff;">
-                <td style="border:1px solid #000000; padding:6px 6px; color:#15803d;">
-                  +${formatMoney(data.totalIncome)}
-                </td>
-                <td style="border:1px solid #000000; padding:6px 6px; color:#b91c1c;">
-                  -${formatMoney(data.totalExpense)}
-                </td>
-                <td style="border:1px solid #000000; padding:6px 6px; color:#0f172a; font-size:10px;">
-                  পাওনা: <span style="color:#15803d;">${formatMoney(data.totalDebtGiven)}</span><br/>
-                  দেনা: <span style="color:#b91c1c;">${formatMoney(data.totalDebtTaken)}</span>
-                </td>
-                <td style="border:1px solid #000000; padding:6px 6px; color:${data.netSavings >= 0 ? '#15803d' : '#b91c1c'};">
-                  ${data.netSavings >= 0 ? '+' : ''}${formatMoney(data.netSavings)}
-                </td>
-              </tr>
-              <!-- Row 2: Breakdown Details -->
-              <tr style="font-size:9.5px; background:#ffffff; color:#334155;">
-                <td style="border:1px solid #000000; padding:4px 5px;">
-                  মোট ${bnNum(incomes.length)} টি আয়ের খাত
-                </td>
-                <td style="border:1px solid #000000; padding:4px 5px;">
-                  সাধারণ: ${formatMoney(expenses.reduce((s, e) => s + e.amount, 0))}<br/>
-                  বাজার: ${formatMoney(marketTotal)}
-                </td>
-                <td style="border:1px solid #000000; padding:4px 5px;">
-                  নিট স্থিতি: <strong style="color:${(data.totalDebtGiven - data.totalDebtTaken) >= 0 ? '#15803d' : '#b91c1c'}">${formatMoney(data.totalDebtGiven - data.totalDebtTaken)}</strong>
-                </td>
-                <td style="border:1px solid #000000; padding:4px 5px; font-weight:700; color:${data.netSavings >= 0 ? '#15803d' : '#b91c1c'};">
-                  ${data.netSavings >= 0 ? '✓ নিট উদ্বৃত্ত সঞ্চয়' : '✕ ঘাটতি'}
-                </td>
-              </tr>
-              <!-- Row 3 & 4: Excel Gridline padding (matching screenshot template) -->
-              <tr style="height:17px; background:#ffffff;">
-                <td style="border:1px solid #000000;">&nbsp;</td>
-                <td style="border:1px solid #000000;">&nbsp;</td>
-                <td style="border:1px solid #000000;">&nbsp;</td>
-                <td style="border:1px solid #000000;">&nbsp;</td>
-              </tr>
-              <tr style="height:17px; background:#ffffff;">
-                <td style="border:1px solid #000000;">&nbsp;</td>
-                <td style="border:1px solid #000000;">&nbsp;</td>
-                <td style="border:1px solid #000000;">&nbsp;</td>
-                <td style="border:1px solid #000000;">&nbsp;</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
+        ${gridHtml}
+        ${summaryCardHtml}
       </div>
-
       <!-- SIGNATURE, AUTHENTICATION & OFFICIAL FOOTER -->
       <div style="border-top:2px dashed #cbd5e1; padding-top:20px; margin-top:26px; display:flex; justify-content:space-between; align-items:flex-end; font-size:11.5px; color:#64748b;">
         <div style="max-width:380px;">
@@ -859,42 +989,85 @@ export async function exportToCSV(
   data: ReportData,
   filename = 'হিসাব_খাতা_ডাটা.csv'
 ): Promise<DeliverFileResult> {
+  const sel = data.sections || {
+    transactions: true,
+    market: true,
+    debt: true,
+    budget: true,
+  };
+
   const rows: string[][] = [];
 
   rows.push(['হিসাব খাতা - আর্থিক বিবরণী']);
   rows.push(['সময়কাল', data.periodName]);
-  rows.push(['ব্যবহারকারী', data.userName]);
+  rows.push(['হিসাবাধিকারী', data.userName]);
   rows.push(['রিপোর্ট তৈরির তারিখ', data.generatedDate]);
   rows.push([]);
 
+  const incomes = sel.transactions ? data.transactions.filter((t) => t.type === 'income') : [];
+  const expenses = sel.transactions ? data.transactions.filter((t) => t.type === 'expense') : [];
+  const marketTotal = sel.market ? data.marketLists.reduce((sum, m) => sum + m.total, 0) : 0;
+  const effectiveIncome = incomes.reduce((s, t) => s + t.amount, 0);
+  const effectiveExpense = expenses.reduce((s, t) => s + t.amount, 0) + marketTotal;
+  const effectiveSavings = effectiveIncome - effectiveExpense;
+
   rows.push(['সারসংক্ষেপ']);
-  rows.push(['মোট আয়', data.totalIncome.toString()]);
-  rows.push(['মোট ব্যয়', data.totalExpense.toString()]);
-  rows.push(['নেট সঞ্চয় / উদ্বৃত্ত', data.netSavings.toString()]);
-  rows.push(['মোট পাওনা (আমি পাবো)', data.totalDebtGiven.toString()]);
-  rows.push(['মোট দেনা (সে পাবে)', data.totalDebtTaken.toString()]);
+  rows.push(['মোট আয়', effectiveIncome.toString()]);
+  rows.push(['মোট ব্যয়', effectiveExpense.toString()]);
+  rows.push(['নেট সঞ্চয় / উদ্বৃত্ত', effectiveSavings.toString()]);
+  if (sel.debt) {
+    rows.push(['মোট পাওনা (আমি পাবো)', data.totalDebtGiven.toString()]);
+    rows.push(['মোট দেনা (সে পাবে)', data.totalDebtTaken.toString()]);
+  }
   rows.push([]);
 
-  rows.push(['আয় ও ব্যয়ের বিবরণী']);
-  rows.push(['তারিখ', 'ধরন', 'খাত/ক্যাটাগরি', 'বিবরণ', 'টাকা']);
-  data.transactions.forEach((t) => {
-    rows.push([
-      t.date,
-      t.type === 'income' ? 'আয়' : 'ব্যয়',
-      t.category,
-      t.desc || '',
-      t.amount.toString(),
-    ]);
-  });
-  rows.push([]);
+  if (sel.transactions) {
+    rows.push(['[আয়-ব্যয় বিবরণী]']);
+    rows.push(['তারিখ', 'ধরন', 'খাত/ক্যাটাগরি', 'বিবরণ', 'টাকা']);
+    data.transactions.forEach((t) => {
+      rows.push([
+        t.date,
+        t.type === 'income' ? 'আয়' : 'ব্যয়',
+        t.category,
+        t.desc || '',
+        t.amount.toString(),
+      ]);
+    });
+    rows.push([]);
+  }
 
-  rows.push(['বাজার খরচ বিবরণী']);
-  rows.push(['তারিখ', 'দোকানের নাম', 'পণ্যের বিবরণ', 'মোট খরচ']);
-  data.marketLists.forEach((m) => {
-    const itemNames = m.items.map((i) => `${i.name} (${i.price}৳)`).join(', ');
-    rows.push([m.date, m.shop, itemNames, m.total.toString()]);
-  });
-  rows.push([]);
+  if (sel.market) {
+    rows.push(['[বাজার খরচ বিবরণী]']);
+    rows.push(['তারিখ', 'দোকানের নাম', 'পণ্যের বিবরণ', 'মোট খরচ']);
+    data.marketLists.forEach((m) => {
+      const itemNames = m.items.map((i) => `${i.name} (${i.price}৳)`).join(', ');
+      rows.push([m.date, m.shop, itemNames, m.total.toString()]);
+    });
+    rows.push([]);
+  }
+
+  if (sel.debt) {
+    rows.push(['[দেনা-পাওনা বিবরণী]']);
+    rows.push(['ব্যক্তি/প্রতিষ্ঠান', 'ধরন', 'বিবরণ/ঠিকানা', 'টাকার পরিমাণ']);
+    data.debtPeople.forEach((d) => {
+      rows.push([
+        d.name,
+        d.dir === 'give' ? 'পাওনা (পাবো)' : 'দেনা (দেবো)',
+        d.addr || '-',
+        d.amount.toString(),
+      ]);
+    });
+    rows.push([]);
+  }
+
+  if (sel.budget) {
+    rows.push(['[বাজেট ব্যবস্থাপনা]']);
+    rows.push(['বাজেট নাম', 'বরাদ্দ', 'অবস্থা']);
+    data.budgets.forEach((b) => {
+      rows.push([b.name, b.amount.toString(), b.status === 'completed' ? 'সম্পন্ন' : 'চলমান']);
+    });
+    rows.push([]);
+  }
 
   const csvContent =
     '\uFEFF' +

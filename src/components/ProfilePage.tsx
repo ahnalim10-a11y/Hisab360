@@ -33,6 +33,7 @@ import {
 import { UserProfile, ArchiveItem } from '../types';
 import { Language, translations, monthsData, formatNumberByLang } from '../utils/i18n';
 import { FullAppBackup, exportAppBackup } from '../utils/pdfGenerator';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 
 interface ProfilePageProps {
   userProfile: UserProfile;
@@ -240,15 +241,20 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     }
   };
 
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+
   const handleResetAllData = () => {
-    const confirmText =
-      lang === 'bn'
-        ? 'আপনি কি নিশ্চিত যে সকল হিসাব মুছে ফেলতে চান? এটি আর ফিরিয়ে আনা যাবে না (যদি না আগে ব্যাকআপ ফাইল ডাউনলোড করা থাকে)।'
-        : 'Are you sure you want to clear all data? This cannot be undone unless you have an exported backup.';
-    if (confirm(confirmText)) {
-      localStorage.clear();
-      window.location.reload();
-    }
+    setIsResetConfirmOpen(true);
+  };
+
+  const handleExecuteReset = () => {
+    localStorage.setItem('hk_trans', '[]');
+    localStorage.setItem('hk_markets', '[]');
+    localStorage.setItem('hk_debt_people', '[]');
+    localStorage.setItem('hk_debt_hist', '[]');
+    localStorage.setItem('hk_budgets', '[]');
+    localStorage.setItem('hk_bill_payments', '[]');
+    window.location.reload();
   };
 
   const appShareUrl = window.location.href;
@@ -859,6 +865,21 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
         </div>
       )}
+
+      {/* Reset Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={isResetConfirmOpen}
+        title={lang === 'bn' ? 'সকল হিসাব মুছে ফেলবেন?' : 'Reset All Data?'}
+        message={
+          lang === 'bn'
+            ? 'আপনি কি নিশ্চিত যে সকল হিসাব মুছে ফেলতে চান? সমস্ত লেনদেন, বাজার, বাজেট ও দেনা-পাওনা ফাঁকা হয়ে নতুনভাবে শুরু হবে।'
+            : 'Are you sure you want to delete all entries? All records will be cleared and reset to fresh state.'
+        }
+        confirmText={lang === 'bn' ? 'হ্যাঁ, সম্পূর্ণ মুছুন' : 'Yes, Delete All'}
+        cancelText={t.cancel}
+        onConfirm={handleExecuteReset}
+        onCancel={() => setIsResetConfirmOpen(false)}
+      />
     </div>
   );
 };
