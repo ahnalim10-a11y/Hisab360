@@ -5,6 +5,7 @@ export interface Transaction {
   amount: number;
   desc?: string;
   date: string;
+  linkedDebtId?: number;
 }
 
 export interface MarketItem {
@@ -29,8 +30,10 @@ export interface DebtPerson {
   id: number;
   name: string;
   addr?: string;
-  dir: 'give' | 'take'; // give: আমি পাবো (he owes me), take: সে পাবে (I owe him)
+  dir: 'give' | 'take'; // give: আমি পাবো (আয়ে যুক্ত), take: আমি দিবো (ব্যয়ে যুক্ত)
   amount: number;
+  date?: string;
+  linkedTransId?: number;
 }
 
 export interface DebtHistory {

@@ -216,6 +216,18 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
   const overallAchievementPct =
     totalTargetAll > 0 ? Math.min(Math.round((totalSpentAll / totalTargetAll) * 100), 100) : 0;
 
+  const computedTotalIncome = useMemo(
+    () => transactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0),
+    [transactions]
+  );
+  const computedTotalExpense = useMemo(
+    () =>
+      transactions.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0) +
+      marketLists.reduce((s, m) => s + m.total, 0),
+    [transactions, marketLists]
+  );
+  const computedNetSavings = computedTotalIncome - computedTotalExpense;
+
   const handleDownloadSectionPdf = async () => {
     setIsDownloading(true);
     setDownloadStatus('টার্গেট ও বাজেট রিপোর্টের PDF তৈরি হচ্ছে...');
@@ -225,9 +237,9 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
         userName,
         signatureUrl,
         generatedDate: getTodayBengaliDate(),
-        totalIncome: 0,
-        totalExpense: 0,
-        netSavings: 0,
+        totalIncome: computedTotalIncome,
+        totalExpense: computedTotalExpense,
+        netSavings: computedNetSavings,
         totalDebtGiven: 0,
         totalDebtTaken: 0,
         transactions,
@@ -277,13 +289,13 @@ export const BudgetPage: React.FC<BudgetPageProps> = ({
           userName,
           signatureUrl,
           generatedDate: getTodayBengaliDate(),
-          totalIncome: 0,
-          totalExpense: 0,
-          netSavings: 0,
+          totalIncome: computedTotalIncome,
+          totalExpense: computedTotalExpense,
+          netSavings: computedNetSavings,
           totalDebtGiven: 0,
           totalDebtTaken: 0,
-          transactions: [],
-          marketLists: [],
+          transactions,
+          marketLists,
           debtPeople: [],
           billPayments: [],
           budgets,

@@ -22,6 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
   selectedYear,
   activeArchiveName,
   lang,
+  onProfileClick,
   onSelectMonth,
 }) => {
   const [isMonthModalOpen, setIsMonthModalOpen] = useState(false);
@@ -85,10 +86,20 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Clean App Ledger Tag */}
-          <div className="px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/20 text-[11px] font-semibold text-emerald-100 shadow-2xs">
-            {lang === 'bn' ? 'দৈনন্দিন খাতা' : 'Daily Khata'}
-          </div>
+          {/* Official Hisab 360 Brand Mark */}
+          <button
+            type="button"
+            onClick={onProfileClick}
+            className="flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/25 text-xs font-extrabold text-white shadow-sm transition cursor-pointer"
+            title={lang === 'bn' ? 'হিসাব ৩৬০' : 'Hisab 360'}
+          >
+            <img
+              src="/logo.jpg"
+              alt="হিসাব ৩৬০"
+              className="w-7 h-7 rounded-full object-cover border border-lime-300/80 shadow-2xs shrink-0"
+            />
+            <span className="tracking-tight">{lang === 'bn' ? 'হিসাব ৩৬০' : 'Hisab 360'}</span>
+          </button>
         </div>
       </div>
 

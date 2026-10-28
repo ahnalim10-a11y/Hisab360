@@ -159,7 +159,7 @@ export const DownloadAndExportModal: React.FC<DownloadAndExportModalProps> = ({
                   </li>
                   <li>
                     {lang === 'bn'
-                      ? 'এরপর আপনার মোবাইলের হোম স্ক্রিনে হিসাব খাতার আসল অ্যাপ আইকন চলে আসবে, যা দিয়ে ইন্টারনেটের বাইরেও ব্যবহার করা যাবে।'
+                      ? 'এরপর আপনার মোবাইলের হোম স্ক্রিনে হিসাব ৩৬০ এর আসল অ্যাপ আইকন চলে আসবে, যা দিয়ে ইন্টারনেটের বাইরেও ব্যবহার করা যাবে।'
                       : 'The app icon will be pinned to your home screen for instant offline use.'}
                   </li>
                 </ol>
@@ -205,7 +205,7 @@ export const DownloadAndExportModal: React.FC<DownloadAndExportModalProps> = ({
                   <li>
                     {lang === 'bn' ? (
                       <>
-                        <strong>ফাইলটি .zip হয়ে নামলে:</strong> GitHub Action থেকে নামানো ফাইলটি <code>.zip</code> হলে সেটিতে চাপ দিয়ে <strong>"Extract" (আনজিপ)</strong> করুন, ভেতরে আসল <code>hisab-khata.apk</code> ফাইলটি পাবেন।
+                        <strong>ফাইলটি .zip হয়ে নামলে:</strong> GitHub Action থেকে নামানো ফাইলটি <code>.zip</code> হলে সেটিতে চাপ দিয়ে <strong>"Extract" (আনজিপ)</strong> করুন, ভেতরে আসল <code>hisab-360.apk</code> ফাইলটি পাবেন।
                       </>
                     ) : (
                       <>If downloaded as .zip, extract it to find the .apk installer inside.</>
@@ -214,7 +214,7 @@ export const DownloadAndExportModal: React.FC<DownloadAndExportModalProps> = ({
                   <li>
                     {lang === 'bn' ? (
                       <>
-                        <strong>"App not installed" বা এরর দেখালে:</strong> ফোনে আগের কোনো হিসাব খাতা অ্যাপ ইনস্টল থাকলে সেটি আগে <strong>Uninstall</strong> করে নিন, তারপর নতুন APK ইনস্টল করুন।
+                        <strong>"App not installed" বা এরর দেখালে:</strong> ফোনে আগের কোনো হিসাব ৩৬০ অ্যাপ ইনস্টল থাকলে সেটি আগে <strong>Uninstall</strong> করে নিন, তারপর নতুন APK ইনস্টল করুন।
                       </>
                     ) : (
                       <>Uninstall any existing version before installing the new APK.</>

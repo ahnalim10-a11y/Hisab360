@@ -70,6 +70,7 @@ export const translations = {
     home: 'হোম',
     report: 'রিপোর্ট',
     market: 'বাজার',
+    notifications: 'নোটিফিকেশন',
     profile: 'প্রোফাইল',
     transactions: 'আয়-ব্যয়',
     budget: 'লক্ষ্য / টার্গেট',
@@ -77,7 +78,7 @@ export const translations = {
     calculator: 'ক্যালকুলেটর',
     
     // Header & Summary
-    welcome: 'হিসাব খাতা অ্যাপে স্বাগতম',
+    welcome: 'হিসাব ৩৬০ অ্যাপে স্বাগতম',
     defaultUser: 'ব্যবহারকারী',
     income: 'আয়',
     expense: 'ব্যয়',
@@ -183,6 +184,7 @@ export const translations = {
     home: 'Home',
     report: 'Report',
     market: 'Market',
+    notifications: 'Alerts',
     profile: 'Profile',
     transactions: 'Entries',
     budget: 'Goal / Target',
@@ -190,7 +192,7 @@ export const translations = {
     calculator: 'Calculator',
     
     // Header & Summary
-    welcome: 'Welcome to Ledger Khata',
+    welcome: 'Welcome to Hisab 360',
     defaultUser: 'User',
     income: 'Income',
     expense: 'Expense',

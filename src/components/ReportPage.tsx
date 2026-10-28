@@ -205,7 +205,7 @@ export const ReportPage: React.FC<ReportPageProps> = ({
       const data = buildReportData(allSections);
       const { blob } = await generateReportPdfBlob(data);
       const fileName = getReportFileName(selectedMonthIdx, selectedYear, activePeriodName, undefined, 'pdf');
-      const shared = await sharePdfFile(blob, fileName, `হিসাব খাতা পূর্ণাঙ্গ রিপোর্ট - ${activePeriodName}`);
+      const shared = await sharePdfFile(blob, fileName, `হিসাব ৩৬০ পূর্ণাঙ্গ রিপোর্ট - ${activePeriodName}`);
       if (shared) {
         setDownloadStatus('✅ শেয়ার অপশন খোলা হয়েছে!');
       } else {
@@ -278,7 +278,7 @@ export const ReportPage: React.FC<ReportPageProps> = ({
       const data = buildReportData(sections);
       const { blob } = await generateReportPdfBlob(data);
       const fileName = getReportFileName(selectedMonthIdx, selectedYear, activePeriodName, undefined, 'pdf');
-      const shared = await sharePdfFile(blob, fileName, `হিসাব খাতা রিপোর্ট - ${activePeriodName}`);
+      const shared = await sharePdfFile(blob, fileName, `হিসাব ৩৬০ রিপোর্ট - ${activePeriodName}`);
       if (shared) {
         setDownloadStatus('✅ শেয়ার অপশন খোলা হয়েছে! WhatsApp বা ড্রাইভে সংরক্ষণ করুন।');
       } else {
@@ -648,10 +648,11 @@ export const ReportPage: React.FC<ReportPageProps> = ({
             >
               {/* Report Header */}
               <div className="text-center border-b-2 border-emerald-600 pb-4 mb-4">
-                <div className="inline-block bg-emerald-50 text-emerald-800 text-[11px] font-bold px-3 py-0.5 rounded-full mb-1">
-                  অফিসিয়াল আর্থিক বিবরণী
+                <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-800 text-[11px] font-bold px-3 py-1 rounded-full mb-1.5">
+                  <img src="/logo.jpg" alt="হিসাব ৩৬০" className="w-4 h-4 rounded-full object-cover" />
+                  <span>অফিসিয়াল আর্থিক বিবরণী</span>
                 </div>
-                <h2 className="text-2xl font-bold text-emerald-800">হিসাব খাতা - মাসিক রিপোর্ট</h2>
+                <h2 className="text-2xl font-bold text-emerald-800">হিসাব ৩৬০ - মাসিক হিসাব রিপোর্ট</h2>
                 <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-stone-600 mt-2">
                   <span>
                     <strong>সময়কাল:</strong> {activePeriodName || 'চলমান মাস'}
@@ -667,69 +668,59 @@ export const ReportPage: React.FC<ReportPageProps> = ({
                 </div>
               </div>
 
-              {/* MIDDLE EXCEL SHEET SECTION (Exact design like user's spreadsheet template) */}
-              <div className="mb-6 space-y-4">
-                {/* 2x2 Grid of Excel Tables */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  
+              {/* DYNAMIC TABLES SECTION (Only actual rows, generous padding, no blank rows) */}
+              <div className="mb-6 space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {/* TABLE 1: আয়-ব্যয় */}
-                  <div className="border-2 border-black bg-white rounded-none overflow-hidden">
-                    <div className="bg-[#ffe600] text-black font-extrabold text-center py-1.5 text-xs sm:text-sm border-b-2 border-black tracking-wide">
-                      আয়-ব্যয়
+                  <div className="border border-emerald-700/40 bg-white rounded-2xl overflow-hidden shadow-2xs">
+                    <div className="bg-emerald-700 text-white font-extrabold text-center py-2.5 px-3 text-xs sm:text-sm tracking-wide">
+                      আয়-ব্যয়ের হিসাব
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-[11px] border-collapse">
                         <thead>
-                          <tr className="bg-white font-bold text-black text-center">
-                            <th className="border border-black py-1 px-1.5 w-[22%]">তারিখ</th>
-                            <th className="border border-black py-1 px-1.5 w-[26%]">ক্যাটাগরি</th>
-                            <th className="border border-black py-1 px-1.5 w-[30%]">বিবরণ</th>
-                            <th className="border border-black py-1 px-1.5 w-[22%] text-right">পরিমাণ</th>
+                          <tr className="bg-emerald-50 font-bold text-emerald-950 text-left">
+                            <th className="border-b border-stone-200 py-2.5 px-3 w-[24%]">তারিখ</th>
+                            <th className="border-b border-stone-200 py-2.5 px-3 w-[26%]">ক্যাটাগরি</th>
+                            <th className="border-b border-stone-200 py-2.5 px-3 w-[28%]">বিবরণ</th>
+                            <th className="border-b border-stone-200 py-2.5 px-3 w-[22%] text-right">পরিমাণ</th>
                           </tr>
                         </thead>
                         <tbody>
                           {transactions.length === 0 ? (
                             <tr>
-                              <td colSpan={4} className="border border-black py-3 text-center text-stone-400 italic">
+                              <td colSpan={4} className="py-5 px-3 text-center text-stone-400 italic">
                                 কোনো এন্ট্রি নেই
                               </td>
                             </tr>
                           ) : (
                             transactions.map((t) => (
-                              <tr key={t.id} className="border-b border-black hover:bg-stone-50">
-                                <td className="border border-black py-1 px-1.5 text-center text-stone-700 whitespace-nowrap">
+                              <tr key={t.id} className="border-b border-stone-200 hover:bg-stone-50">
+                                <td className="py-2.5 px-3 text-stone-700 whitespace-nowrap leading-relaxed">
                                   {t.date}
                                 </td>
-                                <td className="border border-black py-1 px-1.5 font-bold text-stone-900 truncate">
+                                <td className="py-2.5 px-3 font-bold text-stone-900 leading-relaxed">
                                   <span className={`text-[10px] font-extrabold ${t.type === 'income' ? 'text-emerald-700' : 'text-rose-700'}`}>
                                     [{t.type === 'income' ? 'আয়' : 'ব্যয়'}]
-                                  </span> {t.category}
+                                  </span>{' '}
+                                  {t.category}
                                 </td>
-                                <td className="border border-black py-1 px-1.5 text-stone-600 truncate">
+                                <td className="py-2.5 px-3 text-stone-600 leading-relaxed">
                                   {t.desc || '-'}
                                 </td>
-                                <td className={`border border-black py-1 px-1.5 text-right font-extrabold whitespace-nowrap ${t.type === 'income' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                <td className={`py-2.5 px-3 text-right font-extrabold whitespace-nowrap leading-relaxed ${t.type === 'income' ? 'text-emerald-700' : 'text-rose-700'}`}>
                                   {t.type === 'income' ? '+' : '-'}{formatMoney(t.amount)}
                                 </td>
                               </tr>
                             ))
                           )}
-                          {/* Blank padding rows for classic Excel look */}
-                          {Array.from({ length: Math.max(0, 6 - transactions.length) }).map((_, i) => (
-                            <tr key={`blank-trans-${i}`} className="h-5">
-                              <td className="border border-black py-1 px-1.5">&nbsp;</td>
-                              <td className="border border-black py-1 px-1.5">&nbsp;</td>
-                              <td className="border border-black py-1 px-1.5">&nbsp;</td>
-                              <td className="border border-black py-1 px-1.5">&nbsp;</td>
-                            </tr>
-                          ))}
                         </tbody>
                         <tfoot>
-                          <tr className="bg-[#fef9c3] font-bold text-[11px]">
-                            <td colSpan={3} className="border border-black py-1.5 px-2 text-right">
-                              আয়: +{formatMoney(totalIncome)} | ব্যয়:
+                          <tr className="bg-emerald-50/80 font-bold text-[11px] border-t border-emerald-200">
+                            <td colSpan={3} className="py-2.5 px-3 text-right text-stone-800">
+                              আয়: +{formatMoney(totalIncome)} | মোট ব্যয়:
                             </td>
-                            <td className="border border-black py-1.5 px-2 text-right text-rose-700 font-extrabold">
+                            <td className="py-2.5 px-3 text-right text-rose-700 font-extrabold">
                               -{formatMoney(totalExpense)}
                             </td>
                           </tr>
@@ -739,61 +730,52 @@ export const ReportPage: React.FC<ReportPageProps> = ({
                   </div>
 
                   {/* TABLE 2: বাজার ফর্দ */}
-                  <div className="border-2 border-black bg-white rounded-none overflow-hidden">
-                    <div className="bg-[#ffe600] text-black font-extrabold text-center py-1.5 text-xs sm:text-sm border-b-2 border-black tracking-wide">
+                  <div className="border border-amber-600/40 bg-white rounded-2xl overflow-hidden shadow-2xs">
+                    <div className="bg-amber-600 text-white font-extrabold text-center py-2.5 px-3 text-xs sm:text-sm tracking-wide">
                       বাজার ফর্দ
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-[11px] border-collapse">
                         <thead>
-                          <tr className="bg-white font-bold text-black text-center">
-                            <th className="border border-black py-1 px-1.5 w-[22%]">তারিখ</th>
-                            <th className="border border-black py-1 px-1.5 w-[26%]">ক্যাটাগরি</th>
-                            <th className="border border-black py-1 px-1.5 w-[30%]">বিবরণ</th>
-                            <th className="border border-black py-1 px-1.5 w-[22%] text-right">পরিমাণ</th>
+                          <tr className="bg-amber-50 font-bold text-amber-950 text-left">
+                            <th className="border-b border-stone-200 py-2.5 px-3 w-[24%]">তারিখ</th>
+                            <th className="border-b border-stone-200 py-2.5 px-3 w-[26%]">দোকান / খাত</th>
+                            <th className="border-b border-stone-200 py-2.5 px-3 w-[28%]">বিবরণ</th>
+                            <th className="border-b border-stone-200 py-2.5 px-3 w-[22%] text-right">পরিমাণ</th>
                           </tr>
                         </thead>
                         <tbody>
                           {marketLists.length === 0 ? (
                             <tr>
-                              <td colSpan={4} className="border border-black py-3 text-center text-stone-400 italic">
+                              <td colSpan={4} className="py-5 px-3 text-center text-stone-400 italic">
                                 কোনো বাজার ফর্দ নেই
                               </td>
                             </tr>
                           ) : (
                             marketLists.map((m) => (
-                              <tr key={`m-${m.id}`} className="border-b border-black hover:bg-stone-50">
-                                <td className="border border-black py-1 px-1.5 text-center text-stone-700 whitespace-nowrap">
+                              <tr key={`m-${m.id}`} className="border-b border-stone-200 hover:bg-stone-50">
+                                <td className="py-2.5 px-3 text-stone-700 whitespace-nowrap leading-relaxed">
                                   {m.date}
                                 </td>
-                                <td className="border border-black py-1 px-1.5 font-bold text-stone-900 truncate">
+                                <td className="py-2.5 px-3 font-bold text-stone-900 leading-relaxed">
                                   {m.shop || 'বাজার'}
                                 </td>
-                                <td className="border border-black py-1 px-1.5 text-stone-600 truncate">
-                                  {m.items && m.items.length > 0 ? m.items.map((i) => i.name).slice(0, 3).join(', ') : 'বাজার পণ্য'}
+                                <td className="py-2.5 px-3 text-stone-600 leading-relaxed">
+                                  {m.items && m.items.length > 0 ? m.items.map((i) => i.name).join(', ') : 'বাজার পণ্য'}
                                 </td>
-                                <td className="border border-black py-1 px-1.5 text-right font-extrabold text-amber-800 whitespace-nowrap">
+                                <td className="py-2.5 px-3 text-right font-extrabold text-amber-800 whitespace-nowrap leading-relaxed">
                                   -{formatMoney(m.total)}
                                 </td>
                               </tr>
                             ))
                           )}
-                          {/* Blank padding rows for classic Excel look */}
-                          {Array.from({ length: Math.max(0, 6 - marketLists.length) }).map((_, i) => (
-                            <tr key={`blank-mkt-${i}`} className="h-5">
-                              <td className="border border-black py-1 px-1.5">&nbsp;</td>
-                              <td className="border border-black py-1 px-1.5">&nbsp;</td>
-                              <td className="border border-black py-1 px-1.5">&nbsp;</td>
-                              <td className="border border-black py-1 px-1.5">&nbsp;</td>
-                            </tr>
-                          ))}
                         </tbody>
                         <tfoot>
-                          <tr className="bg-[#fef9c3] font-bold text-[11px]">
-                            <td colSpan={3} className="border border-black py-1.5 px-2 text-right">
+                          <tr className="bg-amber-50/80 font-bold text-[11px] border-t border-amber-200">
+                            <td colSpan={3} className="py-2.5 px-3 text-right text-stone-800">
                               সর্বমোট বাজার:
                             </td>
-                            <td className="border border-black py-1.5 px-2 text-right text-amber-800 font-extrabold">
+                            <td className="py-2.5 px-3 text-right text-amber-800 font-extrabold">
                               -{formatMoney(marketExpense)}
                             </td>
                           </tr>
@@ -802,202 +784,162 @@ export const ReportPage: React.FC<ReportPageProps> = ({
                     </div>
                   </div>
 
-                  {/* TABLE 3: বাজেট */}
-                  <div className="border-2 border-black bg-white rounded-none overflow-hidden">
-                    <div className="bg-[#ffe600] text-black font-extrabold text-center py-1.5 text-xs sm:text-sm border-b-2 border-black tracking-wide">
-                      বাজেট
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-[11px] border-collapse">
-                        <thead>
-                          <tr className="bg-white font-bold text-black text-center">
-                            <th className="border border-black py-1 px-1.5 w-[22%]">তারিখ</th>
-                            <th className="border border-black py-1 px-1.5 w-[26%]">ক্যাটাগরি</th>
-                            <th className="border border-black py-1 px-1.5 w-[30%]">বিবরণ</th>
-                            <th className="border border-black py-1 px-1.5 w-[22%] text-right">পরিমাণ</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {budgets.length === 0 ? (
-                            <tr>
-                              <td colSpan={4} className="border border-black py-3 text-center text-stone-400 italic">
-                                কোনো বাজেট নেই
-                              </td>
+                  {/* TABLE 3: লক্ষ্য ও বাজেট (Shown ONLY when user has set at least one target/budget) */}
+                  {budgets.length > 0 && (
+                    <div className="border border-teal-700/40 bg-white rounded-2xl overflow-hidden shadow-2xs">
+                      <div className="bg-teal-700 text-white font-extrabold text-center py-2.5 px-3 text-xs sm:text-sm tracking-wide">
+                        টার্গেট ও বাজেট অগ্রগতি
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-[11px] border-collapse">
+                          <thead>
+                            <tr className="bg-teal-50 font-bold text-teal-950 text-left">
+                              <th className="border-b border-stone-200 py-2.5 px-3 w-[22%]">মেয়াদ</th>
+                              <th className="border-b border-stone-200 py-2.5 px-3 w-[28%]">লক্ষ্য / খাত</th>
+                              <th className="border-b border-stone-200 py-2.5 px-3 w-[28%]">অগ্রগতি</th>
+                              <th className="border-b border-stone-200 py-2.5 px-3 w-[22%] text-right">নির্ধারিত</th>
                             </tr>
-                          ) : (
-                            budgets.map((b) => {
+                          </thead>
+                          <tbody>
+                            {budgets.map((b) => {
                               let spent = 0;
-                              if (b.target === 'expense_total') spent = totalExpense;
+                              if (b.target === 'income_total') spent = totalIncome;
+                              else if (b.target === 'savings_target') spent = Math.max(0, netSavings);
+                              else if (b.target === 'expense_total') spent = totalExpense;
                               else if (b.target === 'market_general') spent = marketExpense;
                               else if (b.target.startsWith('shop_')) {
                                 const s = b.target.replace('shop_', '');
                                 spent = marketLists.filter((m) => m.shop === s).reduce((sum, m) => sum + m.total, 0);
+                              } else {
+                                spent = transactions
+                                  .filter((tr) => tr.type === 'expense' && tr.category.toLowerCase() === b.name.toLowerCase())
+                                  .reduce((sum, tr) => sum + tr.amount, 0);
                               }
-                              const isExceeded = spent > b.amount;
+                              const pct = b.amount > 0 ? Math.round((spent / b.amount) * 100) : 0;
                               return (
-                                <tr key={b.id} className="border-b border-black hover:bg-stone-50">
-                                  <td className="border border-black py-1 px-1.5 text-center text-stone-700 whitespace-nowrap">
-                                    চলমান
+                                <tr key={b.id} className="border-b border-stone-200 hover:bg-stone-50">
+                                  <td className="py-2.5 px-3 text-stone-700 whitespace-nowrap leading-relaxed">
+                                    {b.periodType === 'yearly' ? 'বাতসরিক' : 'মাসিক'}
                                   </td>
-                                  <td className="border border-black py-1 px-1.5 font-bold text-stone-900 truncate">
+                                  <td className="py-2.5 px-3 font-bold text-stone-900 leading-relaxed">
                                     {b.name}
                                   </td>
-                                  <td className="border border-black py-1 px-1.5 text-stone-600 truncate">
-                                    খরচ: {formatMoney(spent)} ({isExceeded ? 'অতিক্রম' : 'সঠিক'})
+                                  <td className="py-2.5 px-3 text-stone-600 leading-relaxed">
+                                    {formatMoney(spent)} ({bnNum(pct)}%)
                                   </td>
-                                  <td className="border border-black py-1 px-1.5 text-right font-extrabold text-purple-700 whitespace-nowrap">
+                                  <td className="py-2.5 px-3 text-right font-extrabold text-teal-800 whitespace-nowrap leading-relaxed">
                                     {formatMoney(b.amount)}
                                   </td>
                                 </tr>
                               );
-                            })
-                          )}
-                          {/* Blank padding rows for classic Excel look */}
-                          {Array.from({ length: Math.max(0, 6 - budgets.length) }).map((_, i) => (
-                            <tr key={`blank-bg-${i}`} className="h-5">
-                              <td className="border border-black py-1 px-1.5">&nbsp;</td>
-                              <td className="border border-black py-1 px-1.5">&nbsp;</td>
-                              <td className="border border-black py-1 px-1.5">&nbsp;</td>
-                              <td className="border border-black py-1 px-1.5">&nbsp;</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr className="bg-[#fef9c3] font-bold text-[11px]">
-                            <td colSpan={3} className="border border-black py-1.5 px-2 text-right">
-                              মোট বাজেট বরাদ্দ:
-                            </td>
-                            <td className="border border-black py-1.5 px-2 text-right text-purple-800 font-extrabold">
-                              {formatMoney(budgets.reduce((s, b) => s + b.amount, 0))}
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* TABLE 4: দেনা-পাওনা */}
-                  <div className="border-2 border-black bg-white rounded-none overflow-hidden">
-                    <div className="bg-[#ffe600] text-black font-extrabold text-center py-1.5 text-xs sm:text-sm border-b-2 border-black tracking-wide">
-                      দেনা-পাওনা
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-[11px] border-collapse">
-                        <thead>
-                          <tr className="bg-white font-bold text-black text-center">
-                            <th className="border border-black py-1 px-1.5 w-[22%]">তারিখ</th>
-                            <th className="border border-black py-1 px-1.5 w-[26%]">ক্যাটাগরি</th>
-                            <th className="border border-black py-1 px-1.5 w-[30%]">বিবরণ</th>
-                            <th className="border border-black py-1 px-1.5 w-[22%] text-right">পরিমাণ</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {debtPeople.length === 0 ? (
-                            <tr>
-                              <td colSpan={4} className="border border-black py-3 text-center text-stone-400 italic">
-                                কোনো দেনা-পাওনা নেই
+                            })}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-teal-50/80 font-bold text-[11px] border-t border-teal-200">
+                              <td colSpan={3} className="py-2.5 px-3 text-right text-stone-800">
+                                মোট নির্ধারিত লক্ষ্য:
+                              </td>
+                              <td className="py-2.5 px-3 text-right text-teal-800 font-extrabold">
+                                {formatMoney(budgets.reduce((s, b) => s + b.amount, 0))}
                               </td>
                             </tr>
-                          ) : (
-                            debtPeople.map((p) => (
-                              <tr key={p.id} className="border-b border-black hover:bg-stone-50">
-                                <td className="border border-black py-1 px-1.5 text-center text-stone-700 whitespace-nowrap">
-                                  হিসাব
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TABLE 4: দেনা-পাওনা */}
+                  {debtPeople.length > 0 && (
+                    <div className="border border-rose-700/40 bg-white rounded-2xl overflow-hidden shadow-2xs">
+                      <div className="bg-rose-700 text-white font-extrabold text-center py-2.5 px-3 text-xs sm:text-sm tracking-wide">
+                        দেনা-পাওনা খতিয়ান
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-[11px] border-collapse">
+                          <thead>
+                            <tr className="bg-rose-50 font-bold text-rose-950 text-left">
+                              <th className="border-b border-stone-200 py-2.5 px-3 w-[28%]">ধরন</th>
+                              <th className="border-b border-stone-200 py-2.5 px-3 w-[44%]">ব্যক্তি ও বিবরণ</th>
+                              <th className="border-b border-stone-200 py-2.5 px-3 w-[28%] text-right">পরিমাণ</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {debtPeople.map((p) => (
+                              <tr key={p.id} className="border-b border-stone-200 hover:bg-stone-50">
+                                <td className={`py-2.5 px-3 font-bold ${p.dir === 'give' ? 'text-emerald-700' : 'text-rose-700'} whitespace-nowrap leading-relaxed`}>
+                                  {p.dir === 'give' ? 'আমি পাবো (আয়)' : 'আমি দিবো (ব্যয়)'}
                                 </td>
-                                <td className={`border border-black py-1 px-1.5 font-bold ${p.dir === 'give' ? 'text-emerald-700' : 'text-rose-700'} whitespace-nowrap`}>
-                                  {p.dir === 'give' ? 'পাওনা (পাবো)' : 'দেনা (দেবো)'}
-                                </td>
-                                <td className="border border-black py-1 px-1.5 text-stone-800 truncate font-semibold">
+                                <td className="py-2.5 px-3 text-stone-800 font-semibold leading-relaxed">
                                   {p.name}{p.addr ? ` (${p.addr})` : ''}
                                 </td>
-                                <td className={`border border-black py-1 px-1.5 text-right font-extrabold whitespace-nowrap ${p.dir === 'give' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                <td className={`py-2.5 px-3 text-right font-extrabold whitespace-nowrap leading-relaxed ${p.dir === 'give' ? 'text-emerald-700' : 'text-rose-700'}`}>
                                   {formatMoney(p.amount)}
                                 </td>
                               </tr>
-                            ))
-                          )}
-                          {/* Blank padding rows for classic Excel look */}
-                          {Array.from({ length: Math.max(0, 6 - debtPeople.length) }).map((_, i) => (
-                            <tr key={`blank-dp-${i}`} className="h-5">
-                              <td className="border border-black py-1 px-1.5">&nbsp;</td>
-                              <td className="border border-black py-1 px-1.5">&nbsp;</td>
-                              <td className="border border-black py-1 px-1.5">&nbsp;</td>
-                              <td className="border border-black py-1 px-1.5">&nbsp;</td>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-rose-50/80 font-bold text-[11px] border-t border-rose-200">
+                              <td colSpan={2} className="py-2.5 px-3 text-right text-stone-800">
+                                পাওনা: {formatMoney(totalDebtGiven)} | দেনা:
+                              </td>
+                              <td className="py-2.5 px-3 text-right text-rose-700 font-extrabold">
+                                -{formatMoney(totalDebtTaken)}
+                              </td>
                             </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr className="bg-[#fef9c3] font-bold text-[11px]">
-                            <td colSpan={3} className="border border-black py-1.5 px-2 text-right">
-                              পাওনা: {formatMoney(totalDebtGiven)} | দেনা:
-                            </td>
-                            <td className="border border-black py-1.5 px-2 text-right text-rose-700 font-extrabold">
-                              -{formatMoney(totalDebtTaken)}
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
+                          </tfoot>
+                        </table>
+                      </div>
                     </div>
-                  </div>
-
+                  )}
                 </div>
 
-                {/* TABLE 5: সার সংক্ষেপ (Wide Excel summary table with user's colored headers) */}
-                <div className="border-2 border-black bg-white rounded-none overflow-hidden">
-                  <div className="bg-white text-black font-extrabold text-center py-1.5 text-xs sm:text-sm border-b-2 border-black">
-                    সার সংক্ষেপ
+                {/* TABLE 5: সার সংক্ষেপ */}
+                <div className="border border-sky-800/40 bg-white rounded-2xl overflow-hidden shadow-2xs">
+                  <div className="bg-sky-900 text-white font-extrabold text-center py-2.5 px-3 text-xs sm:text-sm">
+                    আয়, ব্যয় ও সঞ্চয়ের সারসংক্ষেপ
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs border-collapse text-center">
                       <thead>
-                        <tr className="font-extrabold text-xs">
-                          <th className="border border-black bg-[#ffe600] py-1.5 px-2 w-1/4 text-black">আয়</th>
-                          <th className="border border-black bg-[#fca5a5] py-1.5 px-2 w-1/4 text-black">ব্যয়</th>
-                          <th className="border border-black bg-[#fed7aa] py-1.5 px-2 w-1/4 text-black">দেনা-পাওনা</th>
-                          <th className="border border-black bg-[#86efac] py-1.5 px-2 w-1/4 text-black">সঞ্চয়</th>
+                        <tr className="font-extrabold text-xs bg-stone-50">
+                          <th className="border-b border-r border-stone-200 py-2.5 px-3 w-1/4 text-emerald-900">আয়</th>
+                          <th className="border-b border-r border-stone-200 py-2.5 px-3 w-1/4 text-rose-900">ব্যয়</th>
+                          <th className="border-b border-r border-stone-200 py-2.5 px-3 w-1/4 text-amber-900">দেনা-পাওনা</th>
+                          <th className="border-b border-stone-200 py-2.5 px-3 w-1/4 text-sky-900">সঞ্চয়</th>
                         </tr>
                       </thead>
                       <tbody>
-                        <tr className="font-extrabold text-sm sm:text-base bg-white">
-                          <td className="border border-black py-2 px-2 text-emerald-700">
+                        <tr className="font-extrabold text-sm sm:text-base bg-white border-b border-stone-200">
+                          <td className="border-r border-stone-200 py-3 px-3 text-emerald-700">
                             +{formatMoney(totalIncome)}
                           </td>
-                          <td className="border border-black py-2 px-2 text-rose-700">
+                          <td className="border-r border-stone-200 py-3 px-3 text-rose-700">
                             -{formatMoney(totalExpense)}
                           </td>
-                          <td className="border border-black py-2 px-2 text-stone-900 text-xs sm:text-sm">
-                            পাওনা: <span className="text-emerald-700">{formatMoney(totalDebtGiven)}</span><br/>
+                          <td className="border-r border-stone-200 py-3 px-3 text-stone-900 text-xs sm:text-sm leading-relaxed">
+                            পাওনা: <span className="text-emerald-700">{formatMoney(totalDebtGiven)}</span>
+                            <br />
                             দেনা: <span className="text-rose-700">{formatMoney(totalDebtTaken)}</span>
                           </td>
-                          <td className={`border border-black py-2 px-2 ${netSavings >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          <td className={`py-3 px-3 ${netSavings >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                             {netSavings >= 0 ? '+' : ''}{formatMoney(netSavings)}
                           </td>
                         </tr>
-                        <tr className="text-[11px] bg-white text-stone-600">
-                          <td className="border border-black py-1.5 px-2">
+                        <tr className="text-[11px] bg-stone-50/60 text-stone-600">
+                          <td className="border-r border-stone-200 py-2.5 px-3">
                             মোট {bnNum(transactions.filter((t) => t.type === 'income').length)} টি আয়ের খাত
                           </td>
-                          <td className="border border-black py-1.5 px-2">
+                          <td className="border-r border-stone-200 py-2.5 px-3">
                             সাধারণ: {formatMoney(transExpense)} | বাজার: {formatMoney(marketExpense)}
                           </td>
-                          <td className="border border-black py-1.5 px-2 font-medium">
+                          <td className="border-r border-stone-200 py-2.5 px-3 font-medium">
                             নিট স্থিতি: <strong className={(totalDebtGiven - totalDebtTaken) >= 0 ? 'text-emerald-700' : 'text-rose-700'}>{formatMoney(totalDebtGiven - totalDebtTaken)}</strong>
                           </td>
-                          <td className={`border border-black py-1.5 px-2 font-bold ${netSavings >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          <td className={`py-2.5 px-3 font-bold ${netSavings >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                             {netSavings >= 0 ? '✓ নিট উদ্বৃত্ত সঞ্চয়' : '✕ ঘাটতি'}
                           </td>
-                        </tr>
-                        <tr className="h-4 bg-white">
-                          <td className="border border-black">&nbsp;</td>
-                          <td className="border border-black">&nbsp;</td>
-                          <td className="border border-black">&nbsp;</td>
-                          <td className="border border-black">&nbsp;</td>
-                        </tr>
-                        <tr className="h-4 bg-white">
-                          <td className="border border-black">&nbsp;</td>
-                          <td className="border border-black">&nbsp;</td>
-                          <td className="border border-black">&nbsp;</td>
-                          <td className="border border-black">&nbsp;</td>
                         </tr>
                       </tbody>
                     </table>
@@ -1010,7 +952,7 @@ export const ReportPage: React.FC<ReportPageProps> = ({
                 <div className="space-y-1">
                   <div className="flex items-center gap-1.5 font-semibold text-emerald-800">
                     <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    হিসাব খাতা ডিজিটাল সিস্টেম দ্বারা প্রস্তুতকৃত
+                    হিসাব ৩৬০ ডিজিটাল সিস্টেম দ্বারা প্রস্তুতকৃত
                   </div>
                   <div className="text-[11px]">তারিখ ও সময়: {new Date().toLocaleString('bn-BD')}</div>
                 </div>

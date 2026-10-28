@@ -190,9 +190,9 @@ export const DebtPage: React.FC<DebtPageProps> = ({
         userName,
         signatureUrl,
         generatedDate: getTodayBengaliDate(),
-        totalIncome: 0,
-        totalExpense: 0,
-        netSavings: 0,
+        totalIncome: totalToReceive,
+        totalExpense: totalToPay,
+        netSavings: netDebtBalance,
         totalDebtGiven: totalToReceive,
         totalDebtTaken: totalToPay,
         transactions: [],
@@ -230,9 +230,9 @@ export const DebtPage: React.FC<DebtPageProps> = ({
           userName,
           signatureUrl,
           generatedDate: getTodayBengaliDate(),
-          totalIncome: 0,
-          totalExpense: 0,
-          netSavings: 0,
+          totalIncome: totalToReceive,
+          totalExpense: totalToPay,
+          netSavings: netDebtBalance,
           totalDebtGiven: totalToReceive,
           totalDebtTaken: totalToPay,
           transactions: [],
@@ -261,7 +261,7 @@ export const DebtPage: React.FC<DebtPageProps> = ({
 
   const summaryMetrics: SummaryMetric[] = [
     { label: 'মোট পাওনা (আমি পাবো)', value: `+${formatMoney(totalToReceive)}`, color: 'text-emerald-600' },
-    { label: 'মোট দেনা (সে পাবে)', value: `-${formatMoney(totalToPay)}`, color: 'text-rose-600' },
+    { label: 'মোট দেনা (আমি দিবো)', value: `-${formatMoney(totalToPay)}`, color: 'text-rose-600' },
     {
       label: 'নিট স্থিতি',
       value: `${netDebtBalance >= 0 ? '+' : ''}${formatMoney(netDebtBalance)}`,
@@ -326,10 +326,10 @@ export const DebtPage: React.FC<DebtPageProps> = ({
       </div>
 
       {/* Summary Mini Cards */}
-      <div className="grid grid-cols-2 gap-3 p-4">
+      <div className="grid grid-cols-2 gap-3 p-4 pb-2">
         <div className="p-3 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/40">
           <span className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300">
-            {lang === 'bn' ? 'মোট পাবো (পাওনা)' : 'Total Receivable'}
+            {lang === 'bn' ? 'আমি পাবো (আয়ে যুক্ত)' : 'Receivable (In Income)'}
           </span>
           <div className="text-base sm:text-lg font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
             +{formatMoneyByLang(totalToReceive, lang)}
@@ -337,12 +337,19 @@ export const DebtPage: React.FC<DebtPageProps> = ({
         </div>
         <div className="p-3 rounded-2xl bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40">
           <span className="text-[11px] font-semibold text-rose-800 dark:text-rose-300">
-            {lang === 'bn' ? 'মোট দেবো (দেনা)' : 'Total Payable'}
+            {lang === 'bn' ? 'আমি দিবো (ব্যয়ে যুক্ত)' : 'Payable (In Expense)'}
           </span>
           <div className="text-base sm:text-lg font-bold text-rose-600 dark:text-rose-400 mt-0.5">
             -{formatMoneyByLang(totalToPay, lang)}
           </div>
         </div>
+      </div>
+      <div className="px-4 pb-2">
+        <p className="text-[11px] text-stone-500 dark:text-stone-400 text-center">
+          {lang === 'bn'
+            ? '‘আমি পাবো’ স্বয়ংক্রিয়ভাবে আয়ে এবং ‘আমি দিবো’ ব্যয়ে যুক্ত হয়ে হিসাব ও রিপোর্টে প্রতিফলিত হয়।'
+            : 'Receivables automatically sync to Income and Payables sync to Expense.'}
+        </p>
       </div>
 
       {/* List Content */}
@@ -400,8 +407,8 @@ export const DebtPage: React.FC<DebtPageProps> = ({
                           }`}
                         >
                           {isGive
-                            ? (lang === 'bn' ? 'আমি পাবো' : 'Receivable')
-                            : (lang === 'bn' ? 'সে পাবে' : 'Payable')}
+                            ? (lang === 'bn' ? 'আমি পাবো (আয়)' : 'Receivable')
+                            : (lang === 'bn' ? 'আমি দিবো (ব্যয়)' : 'Payable')}
                         </span>
                       </div>
                     </div>
@@ -596,7 +603,7 @@ export const DebtPage: React.FC<DebtPageProps> = ({
                         }`}
                       >
                         <ArrowDownLeft className="w-4 h-4 text-emerald-600" />
-                        <span>{lang === 'bn' ? 'আমি পাবো (পাওনা)' : 'I will receive'}</span>
+                        <span>{lang === 'bn' ? 'আমি পাবো (আয়ে যুক্ত)' : 'I will receive'}</span>
                       </button>
                       <button
                         type="button"
@@ -608,7 +615,7 @@ export const DebtPage: React.FC<DebtPageProps> = ({
                         }`}
                       >
                         <ArrowUpRight className="w-4 h-4 text-rose-600" />
-                        <span>{lang === 'bn' ? 'সে পাবে (দেনা)' : 'I will pay'}</span>
+                        <span>{lang === 'bn' ? 'আমি দিবো (ব্যয়ে যুক্ত)' : 'I will pay'}</span>
                       </button>
                     </div>
                   </div>
@@ -654,7 +661,7 @@ export const DebtPage: React.FC<DebtPageProps> = ({
                       <option value="">{lang === 'bn' ? '-- নির্বাচন করুন --' : '-- Select --'}</option>
                       {debtPeople.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.name} ({p.dir === 'give' ? 'আমি পাবো' : 'সে পাবে'}: {formatMoneyByLang(p.amount, lang)})
+                          {p.name} ({p.dir === 'give' ? 'আমি পাবো' : 'আমি দিবো'}: {formatMoneyByLang(p.amount, lang)})
                         </option>
                       ))}
                     </select>
@@ -783,7 +790,7 @@ export const DebtPage: React.FC<DebtPageProps> = ({
         isOpen={!!deletingPerson}
         title="দেনা-পাওনা রেকর্ড মুছুন"
         message={`আপনি কি নিশ্চিত '${deletingPerson?.name}' এর ঋণ রেকর্ডটি মুছে ফেলতে চান?`}
-        itemName={deletingPerson ? `${deletingPerson.name} (${deletingPerson.dir === 'give' ? 'আমি পাবো' : 'সে পাবে'}): ${formatMoney(deletingPerson.amount)}` : undefined}
+        itemName={deletingPerson ? `${deletingPerson.name} (${deletingPerson.dir === 'give' ? 'আমি পাবো' : 'আমি দিবো'}): ${formatMoney(deletingPerson.amount)}` : undefined}
         confirmText="হ্যাঁ, মুছুন"
         cancelText="বাতিল"
         onConfirm={() => {

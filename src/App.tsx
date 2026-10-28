@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Home,
   FileText,
@@ -10,8 +10,8 @@ import {
   Users,
   AlertCircle,
   X,
-  Sparkles,
   Calendar,
+  Bell,
 } from 'lucide-react';
 import {
   Transaction,
@@ -24,7 +24,7 @@ import {
   UserProfile,
   ArchiveItem,
 } from './types';
-import { quotesList, bnNum, formatMoney, getPeriodFormattedString } from './utils/bengali';
+import { quotesList, bnNum, formatMoney, getPeriodFormattedString, getTodayBengaliDate } from './utils/bengali';
 import { Header } from './components/Header';
 import { SummaryCards } from './components/SummaryCards';
 import { SearchBar } from './components/SearchBar';
@@ -37,12 +37,13 @@ import { ReportPage } from './components/ReportPage';
 import { DetailsViewPage } from './components/DetailsViewPage';
 import { ProfilePage } from './components/ProfilePage';
 import { DownloadAndExportModal } from './components/DownloadAndExportModal';
-import { DailyBudgetNotifyModal } from './components/DailyBudgetNotifyModal';
-import { Language, translations, formatMoneyByLang, quotesByLang } from './utils/i18n';
+import { NotificationsPage } from './components/NotificationsPage';
+import { AppInfoPages } from './components/AppInfoPages';
+import { Language, translations, quotesByLang } from './utils/i18n';
 import { exportAppBackup, FullAppBackup } from './utils/pdfGenerator';
 import { initBackButton } from './utils/backButton';
 
-// Default initial state
+// Default initial state (with synced দেনা-পাওনা -> আয়-ব্যয় transactions and empty targets until user sets one)
 const defaultTransactions: Transaction[] = [
   { id: 1, type: 'income', category: 'বেতন', amount: 45000, desc: 'মাসিক মূল বেতন', date: '০১ অক্টোবর, ২০২৬' },
   { id: 2, type: 'income', category: 'বোনাস', amount: 8000, desc: 'উৎসব বোনাস', date: '০৫ অক্টোবর, ২০২৬' },
@@ -50,6 +51,8 @@ const defaultTransactions: Transaction[] = [
   { id: 4, type: 'expense', category: 'বিদ্যুৎ বিল', amount: 1450, desc: 'পল্লী বিদ্যুৎ', date: '০৬ অক্টোবর, ২০২৬' },
   { id: 5, type: 'expense', category: 'যাতায়াত', amount: 2200, desc: 'সিএনজি ও বাস ভাড়া', date: '০৮ অক্টোবর, ২০২৬' },
   { id: 6, type: 'expense', category: 'চিকিৎসা ও ওষুধ', amount: 1850, desc: 'প্রেসক্রিপশনের ওষুধ', date: '১২ অক্টোবর, ২০২৬' },
+  { id: 101, type: 'income', category: 'পাওনা হিসাব', amount: 5000, desc: 'কামাল হোসেন (সহকর্মী) - আমি পাবো', date: '০১ অক্টোবর, ২০২৬', linkedDebtId: 1 },
+  { id: 102, type: 'expense', category: 'দেনা হিসাব', amount: 3500, desc: 'রফিক ইলেকট্রনিক্স (কিস্তির টাকা) - আমি দিবো', date: '০১ অক্টোবর, ২০২৬', linkedDebtId: 2 },
 ];
 
 const defaultMarket: MarketList[] = [
@@ -83,22 +86,31 @@ const defaultShops: Shop[] = [
 ];
 
 const defaultDebt: DebtPerson[] = [
-  { id: 1, name: 'কামাল হোসেন', addr: 'সহকর্মী', dir: 'give', amount: 5000 },
-  { id: 2, name: 'রফিক ইলেকট্রনিক্স', addr: 'কিস্তির টাকা', dir: 'take', amount: 3500 },
+  { id: 1, name: 'কামাল হোসেন', addr: 'সহকর্মী', dir: 'give', amount: 5000, date: '০১ অক্টোবর, ২০২৬', linkedTransId: 101 },
+  { id: 2, name: 'রফিক ইলেকট্রনিক্স', addr: 'কিস্তির টাকা', dir: 'take', amount: 3500, date: '০১ অক্টোবর, ২০২৬', linkedTransId: 102 },
 ];
 
-const defaultBudgets: Budget[] = [
-  { id: 1, name: 'মোট মাসিক ব্যয় বাজেট', amount: 35000, target: 'expense_total', status: 'active' },
-  { id: 2, name: 'সাধারণ বাজার খরচ', amount: 8000, target: 'market_general', status: 'active' },
-];
+// Requirement 2: Empty targets until user explicitly sets a target
+const defaultBudgets: Budget[] = [];
+
+type PageType =
+  | 'home'
+  | 'transactions'
+  | 'market'
+  | 'budget'
+  | 'debt'
+  | 'calculator'
+  | 'report'
+  | 'details'
+  | 'profile'
+  | 'notifications'
+  | 'about'
+  | 'privacy'
+  | 'feedback';
 
 export default function App() {
-  // Navigation active tab
-  const [currentPage, setCurrentPage] = useState<
-    'home' | 'transactions' | 'market' | 'budget' | 'debt' | 'calculator' | 'report' | 'details' | 'profile'
-  >('home');
+  const [currentPage, setCurrentPage] = useState<PageType>('home');
 
-  // Details Page configuration
   const [detailsConfig, setDetailsConfig] = useState<{
     title: string;
     type: 'income' | 'expense' | 'market' | 'payment_report';
@@ -147,7 +159,7 @@ export default function App() {
 
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
     const saved = localStorage.getItem('hk_profile');
-    return saved ? JSON.parse(saved) : { name: 'আরিফুল ইসলাম', img: '' };
+    return saved ? JSON.parse(saved) : { name: 'আলিম চৌধুরী', img: '' };
   });
 
   const [archives, setArchives] = useState<ArchiveItem[]>(() => {
@@ -157,13 +169,11 @@ export default function App() {
 
   const [activeArchiveIndex, setActiveArchiveIndex] = useState<number>(-1);
 
-  // Language state (Bengali default, English supported)
   const [lang, setLang] = useState<Language>(() => {
     return (localStorage.getItem('hk_lang') as Language) || 'bn';
   });
   const t = translations[lang];
 
-  // Selected Month & Year (User requested actual month name, e.g. January, February, etc.)
   const [selectedMonthIdx, setSelectedMonthIdx] = useState<number>(() => {
     const saved = localStorage.getItem('hk_sel_month');
     return saved !== null ? parseInt(saved, 10) : new Date().getMonth();
@@ -174,20 +184,29 @@ export default function App() {
     return saved !== null ? parseInt(saved, 10) : new Date().getFullYear();
   });
 
-  // Accounting cycle date range (e.g. 07/10/2026 to 08/11/2026)
   const [cycleStartDate, setCycleStartDate] = useState<string>(() => {
     const saved = localStorage.getItem('hk_cycle_start');
     if (saved) return saved;
-    const y = localStorage.getItem('hk_sel_year') ? parseInt(localStorage.getItem('hk_sel_year')!, 10) : new Date().getFullYear();
-    const m = localStorage.getItem('hk_sel_month') !== null ? parseInt(localStorage.getItem('hk_sel_month')!, 10) : new Date().getMonth();
+    const y = localStorage.getItem('hk_sel_year')
+      ? parseInt(localStorage.getItem('hk_sel_year')!, 10)
+      : new Date().getFullYear();
+    const m =
+      localStorage.getItem('hk_sel_month') !== null
+        ? parseInt(localStorage.getItem('hk_sel_month')!, 10)
+        : new Date().getMonth();
     return `${y}-${String(m + 1).padStart(2, '0')}-07`;
   });
 
   const [cycleEndDate, setCycleEndDate] = useState<string>(() => {
     const saved = localStorage.getItem('hk_cycle_end');
     if (saved) return saved;
-    const y = localStorage.getItem('hk_sel_year') ? parseInt(localStorage.getItem('hk_sel_year')!, 10) : new Date().getFullYear();
-    const m = localStorage.getItem('hk_sel_month') !== null ? parseInt(localStorage.getItem('hk_sel_month')!, 10) : new Date().getMonth();
+    const y = localStorage.getItem('hk_sel_year')
+      ? parseInt(localStorage.getItem('hk_sel_year')!, 10)
+      : new Date().getFullYear();
+    const m =
+      localStorage.getItem('hk_sel_month') !== null
+        ? parseInt(localStorage.getItem('hk_sel_month')!, 10)
+        : new Date().getMonth();
     const nextY = m === 11 ? y + 1 : y;
     const nextM = ((m + 1) % 12) + 1;
     return `${nextY}-${String(nextM).padStart(2, '0')}-08`;
@@ -217,40 +236,62 @@ export default function App() {
     localStorage.setItem('hk_cycle_end', e);
   };
 
-  // Dark mode
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('hk_dark_mode') === 'true';
   });
 
-  // Google Drive auto-sync
-  const [autoDriveSync, setAutoDriveSync] = useState<boolean>(() => {
+  const [autoDriveSync] = useState<boolean>(() => {
     return localStorage.getItem('hk_auto_drive_sync') === 'true';
   });
 
-  const [lastDriveSyncTime, setLastDriveSyncTime] = useState<string | null>(() => {
-    return localStorage.getItem('hk_last_drive_sync');
-  });
-
-  // Budget exceed notification banner
   const [budgetAlert, setBudgetAlert] = useState<string | null>(null);
-
-  // Phone back button exit toast
   const [exitToast, setExitToast] = useState<string | null>(null);
-
-  // Download & Export modal
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
-  // Daily budget popup notification modal (triggers once per day)
-  const [showDailyBudgetModal, setShowDailyBudgetModal] = useState<boolean>(false);
+  const showAppToast = (msg: string) => {
+    setExitToast(msg);
+    setTimeout(() => setExitToast(null), 2800);
+  };
 
+  // Reconcile any legacy unlinked debtPeople with transactions so দেনা-পাওনা always reflects in আয়-ব্যয়
   useEffect(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
-    const lastNotify = localStorage.getItem('hk_daily_budget_notify');
-    if (lastNotify !== todayStr) {
-      setShowDailyBudgetModal(true);
-      localStorage.setItem('hk_daily_budget_notify', todayStr);
+    if (activeArchiveIndex !== -1) return;
+    const unlinked = debtPeople.filter(
+      (p) =>
+        p.amount > 0 &&
+        (!p.linkedTransId || !transactions.some((tr) => tr.id === p.linkedTransId || tr.linkedDebtId === p.id))
+    );
+    if (unlinked.length === 0) return;
+
+    const baseNow = Date.now();
+    const createdTransactions: Transaction[] = [];
+    const updatedPeople = debtPeople.map((p, idx) => {
+      const alreadyLinked = transactions.find(
+        (tr) => tr.id === p.linkedTransId || tr.linkedDebtId === p.id
+      );
+      if (alreadyLinked) {
+        return p.linkedTransId === alreadyLinked.id ? p : { ...p, linkedTransId: alreadyLinked.id };
+      }
+      if (p.amount <= 0) return p;
+      const newTransId = baseNow + idx + 1;
+      const isReceivable = p.dir === 'give';
+      createdTransactions.push({
+        id: newTransId,
+        type: isReceivable ? 'income' : 'expense',
+        category: isReceivable ? 'পাওনা হিসাব' : 'দেনা হিসাব',
+        amount: p.amount,
+        desc: `${p.name}${p.addr ? ` (${p.addr})` : ''} - ${isReceivable ? 'আমি পাবো' : 'আমি দিবো'}`,
+        date: p.date || getTodayBengaliDate(),
+        linkedDebtId: p.id,
+      });
+      return { ...p, linkedTransId: newTransId };
+    });
+
+    if (createdTransactions.length > 0) {
+      setTransactions((prev) => [...prev, ...createdTransactions]);
+      setDebtPeople(updatedPeople);
     }
-  }, []);
+  }, [debtPeople, transactions, activeArchiveIndex]);
 
   // Setup hardware back button & browser back navigation
   useEffect(() => {
@@ -259,13 +300,14 @@ export default function App() {
       onNavigateHome: () => {
         if (currentPage === 'details') {
           setCurrentPage(detailsConfig.returnPage);
+        } else if (currentPage === 'about' || currentPage === 'privacy' || currentPage === 'feedback') {
+          setCurrentPage('profile');
         } else {
           setCurrentPage('home');
         }
       },
       onShowToast: (msg) => {
-        setExitToast(msg);
-        setTimeout(() => setExitToast(null), 2500);
+        showAppToast(msg);
       },
     });
   }, [currentPage, detailsConfig.returnPage]);
@@ -349,8 +391,8 @@ export default function App() {
   }, [archives]);
 
   const getFullBackupData = (): FullAppBackup => ({
-    appName: 'হিসাব খাতা',
-    version: '1.0.0',
+    appName: 'হিসাব ৩৬০',
+    version: '2.0.0',
     exportedAt: new Date().toISOString(),
     userProfile,
     transactions,
@@ -363,9 +405,6 @@ export default function App() {
     archives,
   });
 
-
-
-  // Rotating quotes interval
   useEffect(() => {
     const timer = setInterval(() => {
       setQuoteIdx((prev) => (prev + 1) % quotesList.length);
@@ -377,7 +416,7 @@ export default function App() {
   useEffect(() => {
     let alertText = '';
     const totalExp =
-      transactions.filter((t) => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0) +
+      transactions.filter((tr) => tr.type === 'expense').reduce((sum, tr) => sum + tr.amount, 0) +
       marketLists.reduce((sum, m) => sum + m.total, 0);
 
     budgets.forEach((b) => {
@@ -387,11 +426,7 @@ export default function App() {
       }
     });
 
-    if (alertText) {
-      setBudgetAlert(alertText);
-    } else {
-      setBudgetAlert(null);
-    }
+    setBudgetAlert(alertText || null);
   }, [transactions, marketLists, budgets]);
 
   const isArchiveMode = activeArchiveIndex !== -1;
@@ -410,26 +445,48 @@ export default function App() {
 
   // Totals for summary
   const totalIncome = activeTransactions
-    .filter((t) => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0);
+    .filter((tr) => tr.type === 'income')
+    .reduce((sum, tr) => sum + tr.amount, 0);
 
   const transExpense = activeTransactions
-    .filter((t) => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0);
+    .filter((tr) => tr.type === 'expense')
+    .reduce((sum, tr) => sum + tr.amount, 0);
 
   const marketExpense = activeMarketLists.reduce((sum, m) => sum + m.total, 0);
   const totalExpense = transExpense + marketExpense;
 
-  // Handlers for Transactions
-  const handleSaveTransaction = (
-    transData: Omit<Transaction, 'id'>,
-    id?: number
-  ) => {
+  // Notification badge count for footer button
+  const notificationCount = useMemo(() => {
+    let count = 0;
+    count += activeBudgets.length;
+    count += activeDebtPeople.length;
+    if (activeTransactions.length > 0) count += 1;
+    if (activeMarketLists.length > 0) count += 1;
+    return count;
+  }, [activeBudgets.length, activeDebtPeople.length, activeTransactions.length, activeMarketLists.length]);
+
+  // Handlers for Transactions (keeps linked DebtPerson synced if edited/deleted from TransactionsPage)
+  const handleSaveTransaction = (transData: Omit<Transaction, 'id'>, id?: number) => {
     if (isArchiveMode) return;
     if (id) {
+      const existing = transactions.find((tr) => tr.id === id);
+      const linkedDebtId = existing?.linkedDebtId;
       setTransactions((prev) =>
-        prev.map((t) => (t.id === id ? { ...transData, id } : t))
+        prev.map((tr) => (tr.id === id ? { ...transData, id, linkedDebtId } : tr))
       );
+      if (linkedDebtId) {
+        setDebtPeople((prev) =>
+          prev.map((p) =>
+            p.id === linkedDebtId
+              ? {
+                  ...p,
+                  amount: transData.amount,
+                  dir: transData.type === 'income' ? 'give' : 'take',
+                }
+              : p
+          )
+        );
+      }
     } else {
       setTransactions((prev) => [...prev, { ...transData, id: Date.now() }]);
     }
@@ -437,7 +494,13 @@ export default function App() {
 
   const handleDeleteTransaction = (id: number) => {
     if (isArchiveMode) return;
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
+    const targetTrans = transactions.find((tr) => tr.id === id);
+    setTransactions((prev) => prev.filter((tr) => tr.id !== id));
+    if (targetTrans?.linkedDebtId) {
+      setDebtPeople((prev) => prev.filter((p) => p.id !== targetTrans.linkedDebtId));
+    } else {
+      setDebtPeople((prev) => prev.filter((p) => p.linkedTransId !== id));
+    }
   };
 
   // Handlers for Market
@@ -465,15 +528,12 @@ export default function App() {
   const handleEditShop = (oldName: string, updatedShop: Shop) => {
     if (isArchiveMode) return;
     setShops((prev) => prev.map((s) => (s.name === oldName ? updatedShop : s)));
-    // Update linked market lists
     setMarketLists((prev) =>
       prev.map((m) => (m.shop === oldName ? { ...m, shop: updatedShop.name } : m))
     );
-    // Update linked bill payments
     setBillPayments((prev) =>
       prev.map((bp) => (bp.source === oldName ? { ...bp, source: updatedShop.name } : bp))
     );
-    // Update linked budgets
     setBudgets((prev) =>
       prev.map((b) =>
         b.target === `shop_${oldName}`
@@ -490,9 +550,8 @@ export default function App() {
 
   const handleProcessBillPay = (shopName: string, amount: number) => {
     if (isArchiveMode) return;
-    const paymentId = Date.now();
     const newPayment: BillPayment = {
-      id: paymentId,
+      id: Date.now(),
       source: shopName,
       type: 'market',
       amount,
@@ -518,17 +577,16 @@ export default function App() {
     const targetBudget = budgets.find((b) => b.id === id);
     if (!targetBudget) return;
 
-    // Record as completed expense in transactions
-    const transId = Date.now();
+    const isIncomeGoal = targetBudget.target === 'income_total';
     setTransactions((prev) => [
       ...prev,
       {
-        id: transId,
-        type: 'expense',
+        id: Date.now(),
+        type: isIncomeGoal ? 'income' : 'expense',
         category: 'বাজেট',
         amount: targetBudget.amount,
         desc: `${targetBudget.name} সম্পন্ন হয়েছে`,
-        date: new Date().toLocaleDateString('bn-BD'),
+        date: getTodayBengaliDate(),
       },
     ]);
 
@@ -542,7 +600,7 @@ export default function App() {
     setBudgets((prev) => prev.filter((b) => b.id !== id));
   };
 
-  // Handlers for Debt
+  // Requirement 2: Handlers for Debt with automatic Income (আমি পাবো) & Expense (আমি দিবো) sync
   const handleSaveDebt = (
     data: {
       type: 'new_loan' | 'repay';
@@ -556,8 +614,52 @@ export default function App() {
     id?: number
   ) => {
     if (isArchiveMode) return;
+    const todayStr = getTodayBengaliDate();
+
     if (data.type === 'new_loan') {
+      const loanDir = data.dir || 'give';
+      const isReceivable = loanDir === 'give'; // আমি পাবো -> আয়, আমি দিবো -> ব্যয়
+      const transType: 'income' | 'expense' = isReceivable ? 'income' : 'expense';
+      const transCategory = isReceivable ? 'পাওনা হিসাব' : 'দেনা হিসাব';
+      const transDesc = `${data.name!}${data.addr ? ` (${data.addr})` : ''} - ${
+        isReceivable ? 'আমি পাবো' : 'আমি দিবো'
+      }`;
+
       if (id) {
+        const existingPerson = debtPeople.find((p) => p.id === id);
+        const linkedId = existingPerson?.linkedTransId;
+
+        setTransactions((prev) => {
+          const found = prev.some((tr) => tr.id === linkedId || tr.linkedDebtId === id);
+          if (found) {
+            return prev.map((tr) =>
+              tr.id === linkedId || tr.linkedDebtId === id
+                ? {
+                    ...tr,
+                    type: transType,
+                    category: transCategory,
+                    amount: data.amount,
+                    desc: transDesc,
+                    linkedDebtId: id,
+                  }
+                : tr
+            );
+          }
+          const newTransId = Date.now() + 1;
+          return [
+            ...prev,
+            {
+              id: newTransId,
+              type: transType,
+              category: transCategory,
+              amount: data.amount,
+              desc: transDesc,
+              date: existingPerson?.date || todayStr,
+              linkedDebtId: id,
+            },
+          ];
+        });
+
         setDebtPeople((prev) =>
           prev.map((p) =>
             p.id === id
@@ -565,26 +667,44 @@ export default function App() {
                   ...p,
                   name: data.name!,
                   addr: data.addr,
-                  dir: data.dir || 'give',
+                  dir: loanDir,
                   amount: data.amount,
                 }
               : p
           )
         );
       } else {
+        const debtId = Date.now();
+        const transId = debtId + 1;
+
         setDebtPeople((prev) => [
           ...prev,
           {
-            id: Date.now(),
+            id: debtId,
             name: data.name!,
             addr: data.addr,
-            dir: data.dir || 'give',
+            dir: loanDir,
             amount: data.amount,
+            date: todayStr,
+            linkedTransId: transId,
+          },
+        ]);
+
+        setTransactions((prev) => [
+          ...prev,
+          {
+            id: transId,
+            type: transType,
+            category: transCategory,
+            amount: data.amount,
+            desc: transDesc,
+            date: todayStr,
+            linkedDebtId: debtId,
           },
         ]);
       }
     } else {
-      // Repayment logic
+      // Repayment logic: adjusts remaining linked debt transaction so remaining + repaid === total without double-counting
       const targetPerson = debtPeople.find((p) => p.id === data.personId);
       if (!targetPerson) return;
 
@@ -599,32 +719,42 @@ export default function App() {
         );
       }
 
-      // Add corresponding transaction
-      const transId = Date.now();
+      const repayTransId = Date.now();
       const isIPay = data.repayDir === 'i_pay';
-      setTransactions((prev) => [
-        ...prev,
-        {
-          id: transId,
-          type: isIPay ? 'expense' : 'income',
-          category: 'ঋণ লেনদেন',
-          amount: data.amount,
-          desc: `${targetPerson.name} এর ঋণ ${isIPay ? 'পরিশোধ' : 'আদায়'}`,
-          date: new Date().toLocaleDateString('bn-BD'),
-        },
-      ]);
 
-      // Add to Debt history
+      setTransactions((prev) => {
+        const adjusted = prev.flatMap((tr) => {
+          const isLinkedInitial =
+            (targetPerson.linkedTransId && tr.id === targetPerson.linkedTransId) ||
+            tr.linkedDebtId === targetPerson.id;
+          if (!isLinkedInitial) return [tr];
+          if (remaining <= 0) return [];
+          return [{ ...tr, amount: remaining }];
+        });
+
+        return [
+          ...adjusted,
+          {
+            id: repayTransId,
+            type: isIPay ? 'expense' : 'income',
+            category: isIPay ? 'ঋণ পরিশোধ' : 'ঋণ আদায়',
+            amount: data.amount,
+            desc: `${targetPerson.name} এর ${isIPay ? 'দেনা পরিশোধ' : 'পাওনা আদায়'}`,
+            date: todayStr,
+          },
+        ];
+      });
+
       setDebtHistory((prev) => [
         ...prev,
         {
-          id: Date.now(),
-          relatedId: transId,
+          id: Date.now() + 2,
+          relatedId: repayTransId,
           personId: targetPerson.id,
           name: targetPerson.name,
           amount: data.amount,
           type: data.repayDir || 'i_pay',
-          date: new Date().toLocaleDateString('bn-BD'),
+          date: todayStr,
         },
       ]);
     }
@@ -632,7 +762,15 @@ export default function App() {
 
   const handleDeleteDebtPerson = (id: number) => {
     if (isArchiveMode) return;
+    const person = debtPeople.find((p) => p.id === id);
     setDebtPeople((prev) => prev.filter((p) => p.id !== id));
+    setTransactions((prev) =>
+      prev.filter(
+        (tr) =>
+          tr.linkedDebtId !== id &&
+          (!person?.linkedTransId || tr.id !== person.linkedTransId)
+      )
+    );
   };
 
   const handleDeleteDebtHistory = (id: number) => {
@@ -640,28 +778,71 @@ export default function App() {
     const histItem = debtHistory.find((h) => h.id === id);
     if (!histItem) return;
 
-    // Restore to person amount
-    const personExists = debtPeople.some((p) => p.id === histItem.personId);
-    if (personExists) {
+    const existingPerson = debtPeople.find((p) => p.id === histItem.personId);
+    const restoredDir: 'give' | 'take' = histItem.type === 'i_pay' ? 'take' : 'give';
+    const isReceivable = (existingPerson ? existingPerson.dir : restoredDir) === 'give';
+    const newLinkedTransId = existingPerson?.linkedTransId || Date.now() + 1;
+
+    if (existingPerson) {
+      const updatedAmount = existingPerson.amount + histItem.amount;
       setDebtPeople((prev) =>
         prev.map((p) =>
-          p.id === histItem.personId ? { ...p, amount: p.amount + histItem.amount } : p
+          p.id === histItem.personId
+            ? { ...p, amount: updatedAmount, linkedTransId: newLinkedTransId }
+            : p
         )
       );
+      setTransactions((prev) => {
+        const withoutRepay = prev.filter((tr) => tr.id !== histItem.relatedId);
+        const hasLinked = withoutRepay.some(
+          (tr) => tr.id === existingPerson.linkedTransId || tr.linkedDebtId === existingPerson.id
+        );
+        if (hasLinked) {
+          return withoutRepay.map((tr) =>
+            tr.id === existingPerson.linkedTransId || tr.linkedDebtId === existingPerson.id
+              ? { ...tr, amount: updatedAmount }
+              : tr
+          );
+        }
+        return [
+          ...withoutRepay,
+          {
+            id: newLinkedTransId,
+            type: isReceivable ? 'income' : 'expense',
+            category: isReceivable ? 'পাওনা হিসাব' : 'দেনা হিসাব',
+            amount: updatedAmount,
+            desc: `${existingPerson.name} - ${isReceivable ? 'আমি পাবো' : 'আমি দিবো'}`,
+            date: existingPerson.date || getTodayBengaliDate(),
+            linkedDebtId: existingPerson.id,
+          },
+        ];
+      });
     } else {
       setDebtPeople((prev) => [
         ...prev,
         {
           id: histItem.personId,
           name: histItem.name,
-          dir: histItem.type === 'i_pay' ? 'take' : 'give',
+          dir: restoredDir,
           amount: histItem.amount,
+          date: getTodayBengaliDate(),
+          linkedTransId: newLinkedTransId,
+        },
+      ]);
+      setTransactions((prev) => [
+        ...prev.filter((tr) => tr.id !== histItem.relatedId),
+        {
+          id: newLinkedTransId,
+          type: isReceivable ? 'income' : 'expense',
+          category: isReceivable ? 'পাওনা হিসাব' : 'দেনা হিসাব',
+          amount: histItem.amount,
+          desc: `${histItem.name} - ${isReceivable ? 'আমি পাবো' : 'আমি দিবো'}`,
+          date: getTodayBengaliDate(),
+          linkedDebtId: histItem.personId,
         },
       ]);
     }
 
-    // Remove linked transaction
-    setTransactions((prev) => prev.filter((t) => t.id !== histItem.relatedId));
     setDebtHistory((prev) => prev.filter((h) => h.id !== id));
   };
 
@@ -670,6 +851,7 @@ export default function App() {
     const histItem = debtHistory.find((h) => h.id === id);
     if (!histItem) return;
     const diff = newAmount - histItem.amount;
+    const existingPerson = debtPeople.find((p) => p.id === histItem.personId);
 
     setDebtPeople((prev) =>
       prev.map((p) => {
@@ -681,7 +863,18 @@ export default function App() {
     );
 
     setTransactions((prev) =>
-      prev.map((t) => (t.id === histItem.relatedId ? { ...t, amount: newAmount } : t))
+      prev.map((tr) => {
+        if (tr.id === histItem.relatedId) {
+          return { ...tr, amount: newAmount };
+        }
+        if (
+          existingPerson &&
+          (tr.id === existingPerson.linkedTransId || tr.linkedDebtId === existingPerson.id)
+        ) {
+          return { ...tr, amount: Math.max(0, tr.amount - diff) };
+        }
+        return tr;
+      })
     );
 
     setDebtHistory((prev) =>
@@ -689,7 +882,7 @@ export default function App() {
     );
   };
 
-  // Profile and Archive
+  // Profile, Archive & Complete Data Delete
   const handleUpdateProfile = (name: string, img: string, signatureUrl?: string) => {
     setUserProfile({ name, img, signatureUrl });
   };
@@ -713,14 +906,12 @@ export default function App() {
     setArchives((prev) => [...prev, newArchive]);
     setActiveArchiveIndex(-1);
 
-    // Reset current month data
     setTransactions([]);
     setMarketLists([]);
     setDebtPeople([]);
     setDebtHistory([]);
     setBillPayments([]);
 
-    // Update cycle start and end dates
     setCycleStartDate(startDate);
     setCycleEndDate(endDate);
     localStorage.setItem('hk_cycle_start', startDate);
@@ -746,8 +937,6 @@ export default function App() {
   };
 
   const handleResetActiveMonthOnly = () => {
-    // Only current month's active records are cleared
-    // Saved monthly reports and archives are permanently preserved!
     setTransactions([]);
     setMarketLists([]);
     setDebtPeople([]);
@@ -762,6 +951,27 @@ export default function App() {
     localStorage.setItem('hk_bill_payments', '[]');
   };
 
+  // Requirement 7: Delete ALL app data cleanly
+  const handleDeleteAllData = () => {
+    setActiveArchiveIndex(-1);
+    setTransactions([]);
+    setMarketLists([]);
+    setShops([]);
+    setDebtPeople([]);
+    setDebtHistory([]);
+    setBudgets([]);
+    setBillPayments([]);
+    setArchives([]);
+    localStorage.setItem('hk_trans', '[]');
+    localStorage.setItem('hk_markets', '[]');
+    localStorage.setItem('hk_shops', '[]');
+    localStorage.setItem('hk_debt_people', '[]');
+    localStorage.setItem('hk_debt_hist', '[]');
+    localStorage.setItem('hk_budgets', '[]');
+    localStorage.setItem('hk_bill_payments', '[]');
+    localStorage.setItem('hk_archives', '[]');
+  };
+
   const handleSelectArchive = (index: number) => {
     setActiveArchiveIndex(index);
   };
@@ -772,7 +982,7 @@ export default function App() {
     setShops(defaultShops);
     setDebtPeople(defaultDebt);
     setBudgets(defaultBudgets);
-    alert('নমুনা হিসাব যোগ করা হয়েছে!');
+    showAppToast('নমুনা হিসাব যোগ করা হয়েছে!');
   };
 
   const handleExportAppBackup = () => {
@@ -794,7 +1004,6 @@ export default function App() {
     if (Array.isArray(imported.archives)) setArchives(imported.archives);
   };
 
-  // Details opener
   const openDetails = (
     title: string,
     type: 'income' | 'expense' | 'market' | 'payment_report',
@@ -805,13 +1014,16 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen flex justify-center bg-stone-100 dark:bg-stone-950 font-['Hind_Siliguri',sans-serif] ${darkMode ? 'dark' : ''}`}>
-      {/* Mobile-sized shell or full width responsive container */}
+    <div
+      className={`min-h-screen flex justify-center bg-stone-100 dark:bg-stone-950 font-['Hind_Siliguri',sans-serif] ${
+        darkMode ? 'dark' : ''
+      }`}
+    >
       <div
         id="app-container"
         className="w-full max-w-md min-h-screen bg-white dark:bg-stone-900 shadow-2xl relative flex flex-col overflow-hidden text-stone-900 dark:text-stone-100"
       >
-        {/* Budget Alert Notification Popup */}
+        {/* Budget Exceed Alert Banner */}
         {budgetAlert && (
           <div
             id="notify-popup"
@@ -824,7 +1036,7 @@ export default function App() {
             </div>
             <button
               onClick={() => setBudgetAlert(null)}
-              className="text-white/80 hover:text-white p-1"
+              className="text-white/80 hover:text-white p-1 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -851,8 +1063,12 @@ export default function App() {
                 totalIncome={totalIncome}
                 totalExpense={totalExpense}
                 lang={lang}
-                onIncomeClick={() => openDetails(lang === 'bn' ? 'মোট আয়ের বিবরণী' : 'Income Statement', 'income', 'home')}
-                onExpenseClick={() => openDetails(lang === 'bn' ? 'মোট ব্যয়ের বিবরণী' : 'Expense Statement', 'expense', 'home')}
+                onIncomeClick={() =>
+                  openDetails(lang === 'bn' ? 'মোট আয়ের বিবরণী' : 'Income Statement', 'income', 'home')
+                }
+                onExpenseClick={() =>
+                  openDetails(lang === 'bn' ? 'মোট ব্যয়ের বিবরণী' : 'Expense Statement', 'expense', 'home')
+                }
                 onBalanceClick={() => setCurrentPage('report')}
               />
 
@@ -871,19 +1087,21 @@ export default function App() {
                 </p>
               </div>
 
-              {/* Empty state notice if current month has no transactions or market lists */}
+              {/* Empty state notice */}
               {activeTransactions.length === 0 && activeMarketLists.length === 0 && (
                 <div className="mx-4 mt-3.5 p-5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/90 dark:border-amber-900/50 text-center animate-in fade-in">
                   <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 rounded-full flex items-center justify-center mx-auto mb-2.5 shadow-2xs">
                     <Calendar className="w-6 h-6" />
                   </div>
                   <h3 className="font-bold text-sm text-stone-800 dark:text-stone-100">
-                    {lang === 'bn' ? 'এই মাসে এখনও কোনো হিসাব যোগ করা হয়নি' : 'No entries for this month yet'}
+                    {lang === 'bn'
+                      ? 'এই মাসে এখনও কোনো হিসাব যোগ করা হয়নি'
+                      : 'No entries for this month yet'}
                   </h3>
                   <p className="text-xs text-stone-500 mt-1 max-w-xs mx-auto">
                     {lang === 'bn'
-                      ? 'নির্বাচিত মাসের খাতা বর্তমানে ফাঁকা রয়েছে। আপনি নিচের বাটনগুলোতে চাপ দিয়ে নতুন হিসাব শুরু করতে পারেন।'
-                      : 'The ledger for this month is currently empty. Tap the buttons below to add transactions.'}
+                      ? 'নির্বাচিত মাসের হিসাব ৩৬০ বর্তমানে ফাঁকা রয়েছে। নিচের বাটনগুলোতে চাপ দিয়ে নতুন হিসাব শুরু করুন।'
+                      : 'Your Hisab 360 ledger for this month is empty. Tap below to start recording.'}
                   </p>
                   <div className="flex justify-center gap-2 mt-3.5">
                     <button
@@ -964,7 +1182,6 @@ export default function App() {
                   </span>
                 </button>
 
-                {/* Summary Grid Button */}
                 <button
                   onClick={() => setCurrentPage('report')}
                   className="p-3.5 rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/90 dark:border-stone-800 flex flex-col items-center justify-center gap-2 hover:border-teal-500 hover:bg-teal-50/30 dark:hover:bg-stone-800/60 transition active:scale-95 shadow-2xs group cursor-pointer"
@@ -994,7 +1211,13 @@ export default function App() {
               onBack={() => setCurrentPage('home')}
               onSaveTransaction={handleSaveTransaction}
               onDeleteTransaction={handleDeleteTransaction}
-              onOpenDetails={() => openDetails(lang === 'bn' ? 'আয়-ব্যয়ের বিস্তারিত' : 'Transaction Details', 'income', 'transactions')}
+              onOpenDetails={() =>
+                openDetails(
+                  lang === 'bn' ? 'আয়-ব্যয়ের বিস্তারিত' : 'Transaction Details',
+                  'income',
+                  'transactions'
+                )
+              }
             />
           )}
 
@@ -1018,9 +1241,19 @@ export default function App() {
               onEditShop={handleEditShop}
               onDeleteShop={handleDeleteShop}
               onProcessBillPay={handleProcessBillPay}
-              onOpenDetails={() => openDetails(lang === 'bn' ? 'বাজারের বিস্তারিত খরচ' : 'Market Expense Breakdown', 'market', 'market')}
+              onOpenDetails={() =>
+                openDetails(
+                  lang === 'bn' ? 'বাজারের বিস্তারিত খরচ' : 'Market Expense Breakdown',
+                  'market',
+                  'market'
+                )
+              }
               onOpenPaymentReport={() =>
-                openDetails(lang === 'bn' ? 'দোকান বিল ও বকেয়া রিপোর্ট' : 'Shop Dues & Bill Report', 'payment_report', 'market')
+                openDetails(
+                  lang === 'bn' ? 'দোকান বিল ও বকেয়া রিপোর্ট' : 'Shop Dues & Bill Report',
+                  'payment_report',
+                  'market'
+                )
               }
             />
           )}
@@ -1088,10 +1321,34 @@ export default function App() {
               selectedYear={selectedYear}
               onUpdateCycleDates={handleUpdateCycleDates}
               lang={lang}
-              onOpenIncomeDetails={() => openDetails(lang === 'bn' ? 'মোট আয়ের বিস্তারিত বিবরণ' : 'Total Income Breakdown', 'income', 'report')}
-              onOpenExpenseDetails={() => openDetails(lang === 'bn' ? 'মোট ব্যয়ের বিস্তারিত বিবরণ' : 'Total Expense Breakdown', 'expense', 'report')}
-              onOpenMarketDetails={() => openDetails(lang === 'bn' ? 'বাজারের বিস্তারিত হিসাব' : 'Market Expense Details', 'market', 'report')}
-              onOpenPaymentReport={() => openDetails(lang === 'bn' ? 'দোকানের বাকি ও বিল পরিশোধের রিপোর্ট' : 'Shop Due & Payment Report', 'payment_report', 'report')}
+              onOpenIncomeDetails={() =>
+                openDetails(
+                  lang === 'bn' ? 'মোট আয়ের বিস্তারিত বিবরণ' : 'Total Income Breakdown',
+                  'income',
+                  'report'
+                )
+              }
+              onOpenExpenseDetails={() =>
+                openDetails(
+                  lang === 'bn' ? 'মোট ব্যয়ের বিস্তারিত বিবরণ' : 'Total Expense Breakdown',
+                  'expense',
+                  'report'
+                )
+              }
+              onOpenMarketDetails={() =>
+                openDetails(
+                  lang === 'bn' ? 'বাজারের বিস্তারিত হিসাব' : 'Market Expense Details',
+                  'market',
+                  'report'
+                )
+              }
+              onOpenPaymentReport={() =>
+                openDetails(
+                  lang === 'bn' ? 'দোকানের বাকি ও বিল পরিশোধের রিপোর্ট' : 'Shop Due & Payment Report',
+                  'payment_report',
+                  'report'
+                )
+              }
               onExportAppBackup={handleExportAppBackup}
             />
           )}
@@ -1110,7 +1367,24 @@ export default function App() {
             />
           )}
 
-          {/* 9. PROFILE PAGE */}
+          {/* 9. NOTIFICATIONS PAGE (Requirement 4: All Buttons' Notifications, No Startup Popup) */}
+          {currentPage === 'notifications' && (
+            <NotificationsPage
+              transactions={activeTransactions}
+              marketLists={activeMarketLists}
+              debtPeople={activeDebtPeople}
+              budgets={activeBudgets}
+              billPayments={activeBillPayments}
+              archives={archives}
+              userProfile={userProfile}
+              activePeriodName={activePeriodName}
+              lang={lang}
+              onBack={() => setCurrentPage('home')}
+              onNavigate={(page) => setCurrentPage(page)}
+            />
+          )}
+
+          {/* 10. PROFILE PAGE */}
           {currentPage === 'profile' && (
             <ProfilePage
               userProfile={userProfile}
@@ -1131,11 +1405,21 @@ export default function App() {
               onStartNewMonth={handleStartNewMonth}
               onSaveCurrentMonthArchive={handleSaveCurrentMonthArchive}
               onResetActiveMonthOnly={handleResetActiveMonthOnly}
+              onDeleteAllData={handleDeleteAllData}
+              onOpenInfoPage={(infoPage) => setCurrentPage(infoPage)}
               onSelectArchive={handleSelectArchive}
               onLoadSampleData={handleLoadSampleData}
               onExportBackup={handleExportAppBackup}
               onImportBackup={handleImportAppBackup}
               onOpenDownloadGuide={() => setIsDownloadModalOpen(true)}
+            />
+          )}
+
+          {/* 11. APP INFO PAGES (About, Privacy Policy, Feedback & Support) */}
+          {(currentPage === 'about' || currentPage === 'privacy' || currentPage === 'feedback') && (
+            <AppInfoPages
+              pageType={currentPage}
+              onBack={() => setCurrentPage('profile')}
             />
           )}
         </div>
@@ -1150,82 +1434,101 @@ export default function App() {
           onNavigateToProfile={() => setCurrentPage('profile')}
         />
 
-        {/* Daily Budget Popup Notification Modal (once daily) */}
-        <DailyBudgetNotifyModal
-          isOpen={showDailyBudgetModal}
-          onClose={() => setShowDailyBudgetModal(false)}
-          onNavigateToBudget={() => setCurrentPage('budget')}
-          budgets={activeBudgets}
-          transactions={activeTransactions}
-          marketLists={activeMarketLists}
-          activePeriodName={activePeriodName}
-          lang={lang}
-        />
-
-        {/* Floating Exit Notification Toast on Android/Mobile Back Button */}
+        {/* Floating Toast Notification */}
         {exitToast && (
           <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 bg-stone-900/95 text-white px-4 py-2.5 rounded-full text-xs font-semibold shadow-2xl border border-stone-700/80 backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 flex items-center gap-2 select-none">
-            <span className="text-emerald-400 font-bold">ℹ️</span>
+            <CheckBadge />
             <span>{exitToast}</span>
           </div>
         )}
 
-        {/* BOTTOM NAVIGATION BAR */}
-        <div className="bottom-nav border-t border-stone-200 dark:border-stone-800 bg-white/95 dark:bg-stone-900/95 backdrop-blur-md flex items-center justify-around py-2 px-2 z-30 shrink-0">
+        {/* BOTTOM NAVIGATION BAR (5 Tabs including নোটিফিকেশন) */}
+        <div className="bottom-nav border-t border-stone-200 dark:border-stone-800 bg-white/95 dark:bg-stone-900/95 backdrop-blur-md flex items-center justify-around py-2 px-1.5 z-30 shrink-0">
           <button
             onClick={() => setCurrentPage('home')}
-            className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-2xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-2xl transition-all cursor-pointer ${
               currentPage === 'home'
                 ? 'text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-50 dark:bg-emerald-950/60 shadow-2xs'
                 : 'text-stone-400 hover:text-stone-600 dark:hover:text-stone-200'
             }`}
           >
             <Home className="w-5 h-5" />
-            <span className="text-[11px] font-medium">{t.home}</span>
+            <span className="text-[10px] sm:text-[11px] font-medium">{t.home}</span>
           </button>
 
           <button
             onClick={() => setCurrentPage('report')}
-            className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-2xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-2xl transition-all cursor-pointer ${
               currentPage === 'report'
                 ? 'text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-50 dark:bg-emerald-950/60 shadow-2xs'
                 : 'text-stone-400 hover:text-stone-600 dark:hover:text-stone-200'
             }`}
           >
             <FileText className="w-5 h-5" />
-            <span className="text-[11px] font-medium">{t.report}</span>
+            <span className="text-[10px] sm:text-[11px] font-medium">{t.report}</span>
           </button>
 
           <button
             onClick={() => setCurrentPage('market')}
-            className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-2xl transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-2xl transition-all cursor-pointer ${
               currentPage === 'market'
                 ? 'text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-50 dark:bg-emerald-950/60 shadow-2xs'
                 : 'text-stone-400 hover:text-stone-600 dark:hover:text-stone-200'
             }`}
           >
             <ShoppingBag className="w-5 h-5" />
-            <span className="text-[11px] font-medium">{t.market}</span>
+            <span className="text-[10px] sm:text-[11px] font-medium">{t.market}</span>
           </button>
 
           <button
-            onClick={() => setCurrentPage('profile')}
-            className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-2xl transition-all cursor-pointer ${
-              currentPage === 'profile'
+            onClick={() => setCurrentPage('notifications')}
+            className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-2xl transition-all cursor-pointer ${
+              currentPage === 'notifications'
                 ? 'text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-50 dark:bg-emerald-950/60 shadow-2xs'
                 : 'text-stone-400 hover:text-stone-600 dark:hover:text-stone-200'
             }`}
           >
             <div className="relative">
-              <User className="w-5 h-5" />
-              {currentPage === 'profile' && (
-                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-emerald-500 rounded-full" />
+              <Bell className="w-5 h-5" />
+              {notificationCount > 0 && (
+                <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-extrabold flex items-center justify-center leading-none">
+                  {lang === 'bn' ? bnNum(notificationCount) : notificationCount}
+                </span>
               )}
             </div>
-            <span className="text-[11px] font-medium">{t.profile}</span>
+            <span className="text-[10px] sm:text-[11px] font-medium">{t.notifications}</span>
+          </button>
+
+          <button
+            onClick={() =>
+              setCurrentPage(
+                currentPage === 'about' || currentPage === 'privacy' || currentPage === 'feedback'
+                  ? 'profile'
+                  : 'profile'
+              )
+            }
+            className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-2xl transition-all cursor-pointer ${
+              currentPage === 'profile' ||
+              currentPage === 'about' ||
+              currentPage === 'privacy' ||
+              currentPage === 'feedback'
+                ? 'text-emerald-700 dark:text-emerald-300 font-bold bg-emerald-50 dark:bg-emerald-950/60 shadow-2xs'
+                : 'text-stone-400 hover:text-stone-600 dark:hover:text-stone-200'
+            }`}
+          >
+            <User className="w-5 h-5" />
+            <span className="text-[10px] sm:text-[11px] font-medium">{t.profile}</span>
           </button>
         </div>
       </div>
     </div>
+  );
+}
+
+function CheckBadge() {
+  return (
+    <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-black">
+      ✓
+    </span>
   );
 }
