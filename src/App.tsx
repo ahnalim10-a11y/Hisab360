@@ -11,6 +11,7 @@ import {
   AlertCircle,
   X,
   Sparkles,
+  Calendar,
 } from 'lucide-react';
 import {
   Transaction,
@@ -36,6 +37,7 @@ import { ReportPage } from './components/ReportPage';
 import { DetailsViewPage } from './components/DetailsViewPage';
 import { ProfilePage } from './components/ProfilePage';
 import { DownloadAndExportModal } from './components/DownloadAndExportModal';
+import { DailyBudgetNotifyModal } from './components/DailyBudgetNotifyModal';
 import { Language, translations, formatMoneyByLang, quotesByLang } from './utils/i18n';
 import { exportAppBackup, FullAppBackup } from './utils/pdfGenerator';
 import { initBackButton } from './utils/backButton';
@@ -237,6 +239,18 @@ export default function App() {
 
   // Download & Export modal
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+
+  // Daily budget popup notification modal (triggers once per day)
+  const [showDailyBudgetModal, setShowDailyBudgetModal] = useState<boolean>(false);
+
+  useEffect(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const lastNotify = localStorage.getItem('hk_daily_budget_notify');
+    if (lastNotify !== todayStr) {
+      setShowDailyBudgetModal(true);
+      localStorage.setItem('hk_daily_budget_notify', todayStr);
+    }
+  }, []);
 
   // Setup hardware back button & browser back navigation
   useEffect(() => {
@@ -680,8 +694,8 @@ export default function App() {
     setUserProfile({ name, img, signatureUrl });
   };
 
-  const handleStartNewMonth = (startDate: string, endDate: string) => {
-    const archiveName = `${startDate} হতে ${endDate}`;
+  const handleStartNewMonth = (startDate: string, endDate: string, customName?: string) => {
+    const archiveName = customName || `${startDate} হতে ${endDate}`;
     const newArchive: ArchiveItem = {
       id: Date.now(),
       name: archiveName,
@@ -705,6 +719,47 @@ export default function App() {
     setDebtPeople([]);
     setDebtHistory([]);
     setBillPayments([]);
+
+    // Update cycle start and end dates
+    setCycleStartDate(startDate);
+    setCycleEndDate(endDate);
+    localStorage.setItem('hk_cycle_start', startDate);
+    localStorage.setItem('hk_cycle_end', endDate);
+  };
+
+  const handleSaveCurrentMonthArchive = (customName?: string) => {
+    const archiveName = customName || activePeriodName;
+    const newArchive: ArchiveItem = {
+      id: Date.now(),
+      name: archiveName,
+      data: {
+        transactions: [...transactions],
+        marketLists: [...marketLists],
+        shops: [...shops],
+        debtPeople: [...debtPeople],
+        debtHistory: [...debtHistory],
+        budgets: [...budgets],
+        billPayments: [...billPayments],
+      },
+    };
+    setArchives((prev) => [...prev, newArchive]);
+  };
+
+  const handleResetActiveMonthOnly = () => {
+    // Only current month's active records are cleared
+    // Saved monthly reports and archives are permanently preserved!
+    setTransactions([]);
+    setMarketLists([]);
+    setDebtPeople([]);
+    setDebtHistory([]);
+    setBudgets([]);
+    setBillPayments([]);
+    localStorage.setItem('hk_trans', '[]');
+    localStorage.setItem('hk_markets', '[]');
+    localStorage.setItem('hk_debt_people', '[]');
+    localStorage.setItem('hk_debt_hist', '[]');
+    localStorage.setItem('hk_budgets', '[]');
+    localStorage.setItem('hk_bill_payments', '[]');
   };
 
   const handleSelectArchive = (index: number) => {
@@ -816,6 +871,37 @@ export default function App() {
                 </p>
               </div>
 
+              {/* Empty state notice if current month has no transactions or market lists */}
+              {activeTransactions.length === 0 && activeMarketLists.length === 0 && (
+                <div className="mx-4 mt-3.5 p-5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/90 dark:border-amber-900/50 text-center animate-in fade-in">
+                  <div className="w-12 h-12 bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 rounded-full flex items-center justify-center mx-auto mb-2.5 shadow-2xs">
+                    <Calendar className="w-6 h-6" />
+                  </div>
+                  <h3 className="font-bold text-sm text-stone-800 dark:text-stone-100">
+                    {lang === 'bn' ? 'এই মাসে এখনও কোনো হিসাব যোগ করা হয়নি' : 'No entries for this month yet'}
+                  </h3>
+                  <p className="text-xs text-stone-500 mt-1 max-w-xs mx-auto">
+                    {lang === 'bn'
+                      ? 'নির্বাচিত মাসের খাতা বর্তমানে ফাঁকা রয়েছে। আপনি নিচের বাটনগুলোতে চাপ দিয়ে নতুন হিসাব শুরু করতে পারেন।'
+                      : 'The ledger for this month is currently empty. Tap the buttons below to add transactions.'}
+                  </p>
+                  <div className="flex justify-center gap-2 mt-3.5">
+                    <button
+                      onClick={() => setCurrentPage('transactions')}
+                      className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition active:scale-95 cursor-pointer"
+                    >
+                      + {lang === 'bn' ? 'আয়-ব্যয় যোগ করুন' : 'Add Income/Expense'}
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage('market')}
+                      className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs transition active:scale-95 cursor-pointer"
+                    >
+                      + {lang === 'bn' ? 'বাজার ফর্দ' : 'Market List'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* 6 Grid Menu Items */}
               <div className="p-4 grid grid-cols-3 gap-3">
                 <button
@@ -903,6 +989,8 @@ export default function App() {
               userName={userProfile.name}
               activePeriodName={activePeriodName}
               signatureUrl={userProfile.signatureUrl}
+              selectedMonthIdx={selectedMonthIdx}
+              selectedYear={selectedYear}
               onBack={() => setCurrentPage('home')}
               onSaveTransaction={handleSaveTransaction}
               onDeleteTransaction={handleDeleteTransaction}
@@ -910,7 +998,7 @@ export default function App() {
             />
           )}
 
-          {/* 3. MARKET PAGE (With Edit & Delete Shop) */}
+          {/* 3. MARKET PAGE */}
           {currentPage === 'market' && (
             <MarketPage
               marketLists={activeMarketLists}
@@ -921,6 +1009,8 @@ export default function App() {
               userName={userProfile.name}
               activePeriodName={activePeriodName}
               signatureUrl={userProfile.signatureUrl}
+              selectedMonthIdx={selectedMonthIdx}
+              selectedYear={selectedYear}
               onBack={() => setCurrentPage('home')}
               onSaveMarket={handleSaveMarket}
               onDeleteMarket={handleDeleteMarket}
@@ -947,6 +1037,8 @@ export default function App() {
               userName={userProfile.name}
               activePeriodName={activePeriodName}
               signatureUrl={userProfile.signatureUrl}
+              selectedMonthIdx={selectedMonthIdx}
+              selectedYear={selectedYear}
               onBack={() => setCurrentPage('home')}
               onSaveBudget={handleSaveBudget}
               onCompleteBudget={handleCompleteBudget}
@@ -954,7 +1046,7 @@ export default function App() {
             />
           )}
 
-          {/* 5. DEBT PAGE (With Edit & Delete for Person & History) */}
+          {/* 5. DEBT PAGE */}
           {currentPage === 'debt' && (
             <DebtPage
               debtPeople={activeDebtPeople}
@@ -964,6 +1056,8 @@ export default function App() {
               userName={userProfile.name}
               activePeriodName={activePeriodName}
               signatureUrl={userProfile.signatureUrl}
+              selectedMonthIdx={selectedMonthIdx}
+              selectedYear={selectedYear}
               onBack={() => setCurrentPage('home')}
               onSaveDebt={handleSaveDebt}
               onDeletePerson={handleDeleteDebtPerson}
@@ -977,7 +1071,7 @@ export default function App() {
             <FullCalculator onBack={() => setCurrentPage('home')} />
           )}
 
-          {/* 7. REPORT PAGE (With PDF Download and Save) */}
+          {/* 7. REPORT PAGE */}
           {currentPage === 'report' && (
             <ReportPage
               transactions={activeTransactions}
@@ -990,6 +1084,8 @@ export default function App() {
               activePeriodName={activePeriodName}
               cycleStartDate={cycleStartDate}
               cycleEndDate={cycleEndDate}
+              selectedMonthIdx={selectedMonthIdx}
+              selectedYear={selectedYear}
               onUpdateCycleDates={handleUpdateCycleDates}
               lang={lang}
               onOpenIncomeDetails={() => openDetails(lang === 'bn' ? 'মোট আয়ের বিস্তারিত বিবরণ' : 'Total Income Breakdown', 'income', 'report')}
@@ -1014,7 +1110,7 @@ export default function App() {
             />
           )}
 
-          {/* 9. PROFILE PAGE (Dark mode, Language, Offline Backup) */}
+          {/* 9. PROFILE PAGE */}
           {currentPage === 'profile' && (
             <ProfilePage
               userProfile={userProfile}
@@ -1025,12 +1121,16 @@ export default function App() {
               getFullBackupData={getFullBackupData}
               selectedMonthIdx={selectedMonthIdx}
               selectedYear={selectedYear}
+              cycleStartDate={cycleStartDate}
+              cycleEndDate={cycleEndDate}
               onSelectMonth={handleSelectMonth}
               onBack={() => setCurrentPage('home')}
               onUpdateProfile={handleUpdateProfile}
               onToggleDarkMode={() => setDarkMode(!darkMode)}
               onToggleLanguage={(newLang) => setLang(newLang)}
               onStartNewMonth={handleStartNewMonth}
+              onSaveCurrentMonthArchive={handleSaveCurrentMonthArchive}
+              onResetActiveMonthOnly={handleResetActiveMonthOnly}
               onSelectArchive={handleSelectArchive}
               onLoadSampleData={handleLoadSampleData}
               onExportBackup={handleExportAppBackup}
@@ -1048,6 +1148,18 @@ export default function App() {
           onExportJson={handleExportAppBackup}
           onNavigateToReport={() => setCurrentPage('report')}
           onNavigateToProfile={() => setCurrentPage('profile')}
+        />
+
+        {/* Daily Budget Popup Notification Modal (once daily) */}
+        <DailyBudgetNotifyModal
+          isOpen={showDailyBudgetModal}
+          onClose={() => setShowDailyBudgetModal(false)}
+          onNavigateToBudget={() => setCurrentPage('budget')}
+          budgets={activeBudgets}
+          transactions={activeTransactions}
+          marketLists={activeMarketLists}
+          activePeriodName={activePeriodName}
+          lang={lang}
         />
 
         {/* Floating Exit Notification Toast on Android/Mobile Back Button */}

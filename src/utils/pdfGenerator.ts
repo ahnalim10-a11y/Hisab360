@@ -692,6 +692,87 @@ export async function generateReportPdfBlob(
   return { blob, dataUri, pdf };
 }
 
+export const englishMonthNames = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+/**
+ * Returns formatted file name strictly matching user requirement:
+ * "Hisab khata- January 2026.pdf"
+ * On repeat downloads, appends copy number:
+ * "Hisab khata- January 2026 (1).pdf", "Hisab khata- January 2026 (2).pdf"
+ */
+export function getReportFileName(
+  monthIdx?: number,
+  year?: number,
+  periodName?: string,
+  sectionPrefix?: string,
+  extension: 'pdf' | 'csv' = 'pdf'
+): string {
+  let mName = 'January';
+  let yNum = new Date().getFullYear();
+
+  if (monthIdx !== undefined && monthIdx >= 0 && monthIdx < 12) {
+    mName = englishMonthNames[monthIdx];
+  } else if (periodName) {
+    const bnToEnMap: Record<string, string> = {
+      'জানুয়ারি': 'January',
+      'ফেব্রুয়ারি': 'February',
+      'মার্চ': 'March',
+      'এপ্রিল': 'April',
+      'মে': 'May',
+      'জুন': 'June',
+      'জুলাই': 'July',
+      'আগস্ট': 'August',
+      'সেপ্টেম্বর': 'September',
+      'অক্টোবর': 'October',
+      'নভেম্বর': 'November',
+      'ডিসেম্বর': 'December',
+    };
+    for (const [bn, en] of Object.entries(bnToEnMap)) {
+      if (periodName.includes(bn)) {
+        mName = en;
+        break;
+      }
+    }
+  }
+
+  if (year && year > 2000) {
+    yNum = year;
+  }
+
+  const baseTag = `${sectionPrefix ? `${sectionPrefix}_` : ''}${mName}_${yNum}`;
+  const counterKey = `hk_dl_cnt_${baseTag}`;
+  let count = 0;
+  if (typeof window !== 'undefined' && window.localStorage) {
+    try {
+      const saved = localStorage.getItem(counterKey);
+      count = saved ? parseInt(saved, 10) : 0;
+      localStorage.setItem(counterKey, (count + 1).toString());
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  const copySuffix = count > 0 ? ` (${count})` : '';
+
+  if (sectionPrefix) {
+    return `Hisab khata- ${sectionPrefix}- ${mName} ${yNum}${copySuffix}.${extension}`;
+  }
+  return `Hisab khata- ${mName} ${yNum}${copySuffix}.${extension}`;
+}
+
 /**
  * Universal Mobile-Safe File Deliverer:
  * 1. Native Web Share API (Files): 100% works on installed Android apps, PWAs, Samsung, iOS.
@@ -1126,5 +1207,6 @@ export function generateTextSummary(data: ReportData): string {
 ─────────────────
 🤝 মোট পাওনা: ${formatMoney(data.totalDebtGiven)}
 ⚠️ মোট দেনা: ${formatMoney(data.totalDebtTaken)}
-📝 মোট লেনদেন: ${bnNum(data.transactions.length + data.marketLists.length)} টি`;
+  📝 মোট লেনদেন: ${bnNum(data.transactions.length + data.marketLists.length)} টি`;
 }
+

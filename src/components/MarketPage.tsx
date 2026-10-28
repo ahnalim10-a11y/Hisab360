@@ -20,7 +20,7 @@ import { PopupCalculator } from './PopupCalculator';
 import { registerBackHandler } from '../utils/backButton';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { SectionReportDownloadModal, SummaryMetric } from './SectionReportDownloadModal';
-import { generateReportPdfBlob, directDownloadBlob, exportToCSV, printOrSaveAsPdf } from '../utils/pdfGenerator';
+import { generateReportPdfBlob, directDownloadBlob, exportToCSV, printOrSaveAsPdf, getReportFileName } from '../utils/pdfGenerator';
 
 interface MarketPageProps {
   marketLists: MarketList[];
@@ -31,6 +31,8 @@ interface MarketPageProps {
   userName?: string;
   activePeriodName?: string;
   signatureUrl?: string;
+  selectedMonthIdx?: number;
+  selectedYear?: number;
   onBack: () => void;
   onSaveMarket: (market: Omit<MarketList, 'id'>, id?: number) => void;
   onDeleteMarket: (id: number) => void;
@@ -51,6 +53,8 @@ export const MarketPage: React.FC<MarketPageProps> = ({
   userName = 'ব্যবহারকারী',
   activePeriodName = 'চলমান মাস',
   signatureUrl,
+  selectedMonthIdx,
+  selectedYear,
   onBack,
   onSaveMarket,
   onDeleteMarket,
@@ -271,9 +275,9 @@ export const MarketPage: React.FC<MarketPageProps> = ({
           budget: false,
         },
       });
-      const fileName = `হিসাব_খাতা_বাজার_রিপোর্ট_${activePeriodName.replace(/\s+/g, '_')}.pdf`;
+      const fileName = getReportFileName(selectedMonthIdx, selectedYear, activePeriodName, 'Market', 'pdf');
       await directDownloadBlob(blob, fileName);
-      setDownloadStatus('✅ বাজার খরচের PDF সফলভাবে ডাউনলোড হয়েছে!');
+      setDownloadStatus(`✅ ${fileName} সফলভাবে ডাউনলোড হয়েছে!`);
     } catch (err) {
       console.error('Market PDF error:', err);
       setDownloadStatus('⚠️ সাধারণ ডাউনলোড সমস্যা হয়েছে, প্রিন্ট অপশন দেখুন');
@@ -287,7 +291,7 @@ export const MarketPage: React.FC<MarketPageProps> = ({
     setIsDownloading(true);
     setDownloadStatus('বাজার খরচের এক্সেল CSV তৈরি হচ্ছে...');
     try {
-      const fileName = `হিসাব_খাতা_বাজার_ডাটা_${activePeriodName.replace(/\s+/g, '_')}.csv`;
+      const fileName = getReportFileName(selectedMonthIdx, selectedYear, activePeriodName, 'Market', 'csv');
       await exportToCSV(
         {
           periodName: activePeriodName,

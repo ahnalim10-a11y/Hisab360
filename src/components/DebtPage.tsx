@@ -7,7 +7,7 @@ import { PopupCalculator } from './PopupCalculator';
 import { registerBackHandler } from '../utils/backButton';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { SectionReportDownloadModal, SummaryMetric } from './SectionReportDownloadModal';
-import { generateReportPdfBlob, directDownloadBlob, exportToCSV, printOrSaveAsPdf } from '../utils/pdfGenerator';
+import { generateReportPdfBlob, directDownloadBlob, exportToCSV, printOrSaveAsPdf, getReportFileName } from '../utils/pdfGenerator';
 
 interface DebtPageProps {
   debtPeople: DebtPerson[];
@@ -17,6 +17,8 @@ interface DebtPageProps {
   userName?: string;
   activePeriodName?: string;
   signatureUrl?: string;
+  selectedMonthIdx?: number;
+  selectedYear?: number;
   onBack: () => void;
   onSaveDebt: (
     data: {
@@ -43,6 +45,8 @@ export const DebtPage: React.FC<DebtPageProps> = ({
   userName = 'ব্যবহারকারী',
   activePeriodName = 'চলমান মাস',
   signatureUrl,
+  selectedMonthIdx,
+  selectedYear,
   onBack,
   onSaveDebt,
   onDeletePerson,
@@ -203,9 +207,9 @@ export const DebtPage: React.FC<DebtPageProps> = ({
           budget: false,
         },
       });
-      const fileName = `হিসাব_খাতা_দেনা_পাওনা_রিপোর্ট_${activePeriodName.replace(/\s+/g, '_')}.pdf`;
+      const fileName = getReportFileName(selectedMonthIdx, selectedYear, activePeriodName, 'Debt', 'pdf');
       await directDownloadBlob(blob, fileName);
-      setDownloadStatus('✅ দেনা-পাওনার PDF সফলভাবে ডাউনলোড হয়েছে!');
+      setDownloadStatus(`✅ ${fileName} সফলভাবে ডাউনলোড হয়েছে!`);
     } catch (err) {
       console.error('Debt PDF error:', err);
       setDownloadStatus('⚠️ সাধারণ ডাউনলোড সমস্যা হয়েছে, প্রিন্ট অপশন দেখুন');
@@ -219,7 +223,7 @@ export const DebtPage: React.FC<DebtPageProps> = ({
     setIsDownloading(true);
     setDownloadStatus('দেনা-পাওনার এক্সেল CSV তৈরি হচ্ছে...');
     try {
-      const fileName = `হিসাব_খাতা_দেনা_পাওনা_ডাটা_${activePeriodName.replace(/\s+/g, '_')}.csv`;
+      const fileName = getReportFileName(selectedMonthIdx, selectedYear, activePeriodName, 'Debt', 'csv');
       await exportToCSV(
         {
           periodName: activePeriodName,

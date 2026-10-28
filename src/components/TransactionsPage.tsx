@@ -7,7 +7,7 @@ import { PopupCalculator } from './PopupCalculator';
 import { registerBackHandler } from '../utils/backButton';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { SectionReportDownloadModal, SummaryMetric } from './SectionReportDownloadModal';
-import { generateReportPdfBlob, directDownloadBlob, exportToCSV, printOrSaveAsPdf } from '../utils/pdfGenerator';
+import { generateReportPdfBlob, directDownloadBlob, exportToCSV, printOrSaveAsPdf, getReportFileName } from '../utils/pdfGenerator';
 
 interface TransactionsPageProps {
   transactions: Transaction[];
@@ -16,6 +16,8 @@ interface TransactionsPageProps {
   userName?: string;
   activePeriodName?: string;
   signatureUrl?: string;
+  selectedMonthIdx?: number;
+  selectedYear?: number;
   onBack: () => void;
   onSaveTransaction: (transaction: Omit<Transaction, 'id'>, id?: number) => void;
   onDeleteTransaction: (id: number) => void;
@@ -29,6 +31,8 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
   userName = 'ব্যবহারকারী',
   activePeriodName = 'চলমান মাস',
   signatureUrl,
+  selectedMonthIdx,
+  selectedYear,
   onBack,
   onSaveTransaction,
   onDeleteTransaction,
@@ -163,9 +167,9 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
           budget: false,
         },
       });
-      const fileName = `হিসাব_খাতা_আয়_ব্যয়_রিপোর্ট_${activePeriodName.replace(/\s+/g, '_')}.pdf`;
+      const fileName = getReportFileName(selectedMonthIdx, selectedYear, activePeriodName, 'Income-Expense', 'pdf');
       await directDownloadBlob(blob, fileName);
-      setDownloadStatus('✅ আয়-ব্যয়ের PDF সফলভাবে ডাউনলোড হয়েছে!');
+      setDownloadStatus(`✅ ${fileName} সফলভাবে ডাউনলোড হয়েছে!`);
     } catch (err) {
       console.error('PDF error:', err);
       setDownloadStatus('⚠️ সাধারণ ডাউনলোড সমস্যা হয়েছে, প্রিন্ট অপশন দেখুন');
@@ -179,7 +183,7 @@ export const TransactionsPage: React.FC<TransactionsPageProps> = ({
     setIsDownloading(true);
     setDownloadStatus('আয়-ব্যয়ের এক্সেল CSV তৈরি হচ্ছে...');
     try {
-      const fileName = `হিসাব_খাতা_আয়_ব্যয়_ডাটা_${activePeriodName.replace(/\s+/g, '_')}.csv`;
+      const fileName = getReportFileName(selectedMonthIdx, selectedYear, activePeriodName, 'Income-Expense', 'csv');
       await exportToCSV(
         {
           periodName: activePeriodName,

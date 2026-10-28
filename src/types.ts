@@ -48,6 +48,7 @@ export interface Budget {
   name: string;
   amount: number;
   target: string; // income_total | expense_total | market_general | shop_XYZ | others
+  periodType?: 'monthly' | 'yearly'; // মাসিক বা বাৎসরিক বাজেট
   status: 'active' | 'completed';
 }
 

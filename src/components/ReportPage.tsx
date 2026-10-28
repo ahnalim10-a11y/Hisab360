@@ -27,6 +27,7 @@ import {
   printOrSaveAsPdf,
   exportToCSV,
   ReportData,
+  getReportFileName,
 } from '../utils/pdfGenerator';
 import { Language, translations } from '../utils/i18n';
 import { ReportDownloadOptionsModal } from './ReportDownloadOptionsModal';
@@ -42,6 +43,8 @@ interface ReportPageProps {
   activePeriodName: string;
   cycleStartDate?: string;
   cycleEndDate?: string;
+  selectedMonthIdx?: number;
+  selectedYear?: number;
   onUpdateCycleDates?: (start: string, end: string) => void;
   lang?: Language;
   onOpenIncomeDetails: () => void;
@@ -62,6 +65,8 @@ export const ReportPage: React.FC<ReportPageProps> = ({
   activePeriodName,
   cycleStartDate,
   cycleEndDate,
+  selectedMonthIdx,
+  selectedYear,
   onUpdateCycleDates,
   lang = 'bn',
   onOpenIncomeDetails,
@@ -155,18 +160,78 @@ export const ReportPage: React.FC<ReportPageProps> = ({
     expenseByCategory['বাজার খরচ'] = (expenseByCategory['বাজার খরচ'] || 0) + marketExpense;
   }
 
-  // Direct PDF Download with user's selected sections
+  // Direct Full PDF Download (No modal / prompt - 1 click downloads all sections)
+  const handleDirectDownloadFullPdf = async () => {
+    setIsDownloadingPdf(true);
+    setDownloadStatus('সকল হিসাবের পূর্ণাঙ্গ রিপোর্ট PDF প্রস্তুত হচ্ছে...');
+    try {
+      const allSections: ReportSectionsSelection = {
+        transactions: true,
+        market: true,
+        debt: true,
+        budget: true,
+      };
+      const data = buildReportData(allSections);
+      const { blob } = await generateReportPdfBlob(data);
+      const fileName = getReportFileName(selectedMonthIdx, selectedYear, activePeriodName, undefined, 'pdf');
+      const res = await directDownloadBlob(blob, fileName);
+      if (res.success) {
+        setDownloadStatus(`✅ ${fileName} সফলভাবে ডাউনলোড হয়েছে!`);
+      } else {
+        setDownloadStatus('⚠️ সরাসরি ডাউনলোড সমস্যা হয়েছে, নতুন ট্যাবে ওপেন করা হচ্ছে...');
+        openPdfInNewTab(blob);
+      }
+    } catch (err) {
+      console.error('Direct PDF download error:', err);
+      setDownloadStatus('⚠️ ব্রাউজারের প্রিন্ট ডায়লগ ওপেন করা হয়েছে');
+      printOrSaveAsPdf();
+    } finally {
+      setIsDownloadingPdf(false);
+      setTimeout(() => setDownloadStatus(null), 5000);
+    }
+  };
+
+  // Direct Full PDF Share
+  const handleDirectShareFullPdf = async () => {
+    setIsDownloadingPdf(true);
+    setDownloadStatus('সকল হিসাবের পূর্ণাঙ্গ রিপোর্ট শেয়ারের জন্য প্রস্তুত হচ্ছে...');
+    try {
+      const allSections: ReportSectionsSelection = {
+        transactions: true,
+        market: true,
+        debt: true,
+        budget: true,
+      };
+      const data = buildReportData(allSections);
+      const { blob } = await generateReportPdfBlob(data);
+      const fileName = getReportFileName(selectedMonthIdx, selectedYear, activePeriodName, undefined, 'pdf');
+      const shared = await sharePdfFile(blob, fileName, `হিসাব খাতা পূর্ণাঙ্গ রিপোর্ট - ${activePeriodName}`);
+      if (shared) {
+        setDownloadStatus('✅ শেয়ার অপশন খোলা হয়েছে!');
+      } else {
+        printOrSaveAsPdf();
+      }
+    } catch (err) {
+      console.error('Share error:', err);
+      printOrSaveAsPdf();
+    } finally {
+      setIsDownloadingPdf(false);
+      setTimeout(() => setDownloadStatus(null), 5000);
+    }
+  };
+
+  // Direct PDF Download with custom selected sections (kept for statement view or fallback)
   const handleDownloadSelectivePdf = async (sections: ReportSectionsSelection) => {
     setIsOptionsModalOpen(false);
     setIsDownloadingPdf(true);
-    setDownloadStatus('নির্বাচিত বাটনের হিসাব অনুযায়ী পিডিএফ প্রস্তুত হচ্ছে...');
+    setDownloadStatus('নির্বাচিত হিসাব অনুযায়ী পিডিএফ প্রস্তুত হচ্ছে...');
     try {
       const data = buildReportData(sections);
       const { blob } = await generateReportPdfBlob(data);
-      const fileName = `হিসাব_খাতা_রিপোর্ট_${(activePeriodName || 'চলমান_মাস').replace(/\s+/g, '_')}.pdf`;
+      const fileName = getReportFileName(selectedMonthIdx, selectedYear, activePeriodName, undefined, 'pdf');
       const res = await directDownloadBlob(blob, fileName);
       if (res.success) {
-        setDownloadStatus('✅ নির্বাচিত সেকশনের PDF সফলভাবে ডাউনলোড হয়েছে!');
+        setDownloadStatus(`✅ ${fileName} সফলভাবে ডাউনলোড হয়েছে!`);
       } else {
         setDownloadStatus('⚠️ সাধারণ ডাউনলোড সমস্যা হয়েছে, পিডিএফ সরাসরি খোলা হচ্ছে...');
         openPdfInNewTab(blob);
@@ -185,13 +250,13 @@ export const ReportPage: React.FC<ReportPageProps> = ({
   const handleExportSelectiveCsv = async (sections: ReportSectionsSelection) => {
     setIsOptionsModalOpen(false);
     setIsDownloadingPdf(true);
-    setDownloadStatus('নির্বাচিত হিসাবের এক্সেল CSV প্রস্তুত হচ্ছে...');
+    setDownloadStatus('সকল হিসাবের এক্সেল CSV প্রস্তুত হচ্ছে...');
     try {
       const data = buildReportData(sections);
-      const fileName = `হিসাব_খাতা_রিপোর্ট_${(activePeriodName || 'চলমান_মাস').replace(/\s+/g, '_')}.csv`;
+      const fileName = getReportFileName(selectedMonthIdx, selectedYear, activePeriodName, undefined, 'csv');
       const res = await exportToCSV(data, fileName);
       if (res.success) {
-        setDownloadStatus('✅ এক্সেল CSV সফলভাবে ডাউনলোড হয়েছে!');
+        setDownloadStatus(`✅ ${fileName} সফলভাবে ডাউনলোড হয়েছে!`);
       } else {
         setDownloadStatus('⚠️ CSV ডাউনলোড সম্পন্ন হয়নি');
       }
@@ -212,7 +277,7 @@ export const ReportPage: React.FC<ReportPageProps> = ({
     try {
       const data = buildReportData(sections);
       const { blob } = await generateReportPdfBlob(data);
-      const fileName = `হিসাব_খাতা_রিপোর্ট_${(activePeriodName || 'চলমান_মাস').replace(/\s+/g, '_')}.pdf`;
+      const fileName = getReportFileName(selectedMonthIdx, selectedYear, activePeriodName, undefined, 'pdf');
       const shared = await sharePdfFile(blob, fileName, `হিসাব খাতা রিপোর্ট - ${activePeriodName}`);
       if (shared) {
         setDownloadStatus('✅ শেয়ার অপশন খোলা হয়েছে! WhatsApp বা ড্রাইভে সংরক্ষণ করুন।');
@@ -268,14 +333,14 @@ export const ReportPage: React.FC<ReportPageProps> = ({
           </div>
         </div>
 
-        {/* SIDE-BY-SIDE SHARE & DOWNLOAD BUTTONS (Both trigger selective section modal) */}
+        {/* DIRECT 1-CLICK SHARE & DOWNLOAD BUTTONS (No popup/modal - downloads all sections) */}
         <div className="flex items-center gap-2">
           {/* Share Button */}
           <button
-            onClick={() => setIsOptionsModalOpen(true)}
+            onClick={handleDirectShareFullPdf}
             disabled={isDownloadingPdf}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs sm:text-sm shadow-xs active:scale-95 transition cursor-pointer disabled:opacity-60"
-            title="বাটন নির্বাচন করে শেয়ার করুন"
+            title="সকল হিসাবের রিপোর্ট শেয়ার করুন"
           >
             <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-100" />
             <span>শেয়ার</span>
@@ -283,10 +348,10 @@ export const ReportPage: React.FC<ReportPageProps> = ({
 
           {/* Download Button */}
           <button
-            onClick={() => setIsOptionsModalOpen(true)}
+            onClick={handleDirectDownloadFullPdf}
             disabled={isDownloadingPdf}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-emerald-600/25 active:scale-95 transition cursor-pointer disabled:opacity-60"
-            title="বাটন নির্বাচন করে PDF ডাউনলোড করুন"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-emerald-600/25 active:scale-95 transition cursor-pointer disabled:opacity-60"
+            title="সকল হিসাবের পূর্ণাঙ্গ রিপোর্ট সরাসরি PDF ডাউনলোড করুন"
           >
             <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
             <span>ডাউনলোড</span>

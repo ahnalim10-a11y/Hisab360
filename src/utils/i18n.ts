@@ -72,7 +72,7 @@ export const translations = {
     market: 'বাজার',
     profile: 'প্রোফাইল',
     transactions: 'আয়-ব্যয়',
-    budget: 'বাজেট',
+    budget: 'লক্ষ্য / টার্গেট',
     debt: 'দেনা-পাওনা',
     calculator: 'ক্যালকুলেটর',
     
@@ -93,7 +93,7 @@ export const translations = {
     // Menu Grid
     incomeExpenseMenu: 'আয়-ব্যয়',
     marketListMenu: 'বাজার ফর্দ',
-    budgetMenu: 'বাজেট',
+    budgetMenu: 'লক্ষ্য / টার্গেট',
     debtMenu: 'দেনা-পাওনা',
     calculatorMenu: 'ক্যালকুলেটর',
     reportPdfMenu: 'রিপোর্ট',
@@ -185,7 +185,7 @@ export const translations = {
     market: 'Market',
     profile: 'Profile',
     transactions: 'Entries',
-    budget: 'Budget',
+    budget: 'Goal / Target',
     debt: 'Debts',
     calculator: 'Calculator',
     
@@ -206,7 +206,7 @@ export const translations = {
     // Menu Grid
     incomeExpenseMenu: 'Income-Expense',
     marketListMenu: 'Market List',
-    budgetMenu: 'Budget',
+    budgetMenu: 'Goal / Target',
     debtMenu: 'Debts & Loans',
     calculatorMenu: 'Calculator',
     reportPdfMenu: 'Report',

@@ -50,7 +50,9 @@ interface ProfilePageProps {
   onToggleLanguage: (newLang: Language) => void;
   onToggleAutoDriveSync?: (enabled: boolean) => void;
   onSetLastDriveSyncTime?: (time: string) => void;
-  onStartNewMonth: (startDate: string, endDate: string) => void;
+  onStartNewMonth: (startDate: string, endDate: string, customName?: string) => void;
+  onSaveCurrentMonthArchive?: (customName?: string) => void;
+  onResetActiveMonthOnly?: () => void;
   onSelectArchive: (index: number) => void;
   onLoadSampleData?: () => void;
   onExportBackup?: () => void;
@@ -58,6 +60,8 @@ interface ProfilePageProps {
   onOpenDownloadGuide?: () => void;
   selectedMonthIdx?: number;
   selectedYear?: number;
+  cycleStartDate?: string;
+  cycleEndDate?: string;
   onSelectMonth?: (monthIdx: number, year: number) => void;
 }
 
@@ -77,6 +81,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   onToggleAutoDriveSync,
   onSetLastDriveSyncTime,
   onStartNewMonth,
+  onSaveCurrentMonthArchive,
+  onResetActiveMonthOnly,
   onSelectArchive,
   onLoadSampleData,
   onExportBackup,
@@ -84,6 +90,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   onOpenDownloadGuide,
   selectedMonthIdx,
   selectedYear,
+  cycleStartDate,
+  cycleEndDate,
   onSelectMonth,
 }) => {
   const t = translations[lang];
@@ -173,18 +181,54 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     if (sigFileInputRef.current) sigFileInputRef.current.value = '';
   };
 
+  // Helper to compute automatic month name
+  const computeMonthNameFromDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+      const parts = dateStr.split('-');
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10) - 1;
+      const mItem = monthsData[m] || monthsData[0];
+      return `${lang === 'bn' ? mItem.bn : mItem.en} ${formatNumberByLang(y, lang)}`;
+    } catch {
+      return '';
+    }
+  };
+
+  const initialStart =
+    cycleStartDate ||
+    new Date(selectedYear || new Date().getFullYear(), selectedMonthIdx !== undefined ? selectedMonthIdx : new Date().getMonth(), 1)
+      .toISOString()
+      .split('T')[0];
+
+  const initialEnd =
+    cycleEndDate ||
+    new Date(selectedYear || new Date().getFullYear(), (selectedMonthIdx !== undefined ? selectedMonthIdx : new Date().getMonth()) + 1, 0)
+      .toISOString()
+      .split('T')[0];
+
+  const [calStartDate, setCalStartDate] = useState(initialStart);
+  const [calEndDate, setCalEndDate] = useState(initialEnd);
+  const [customMonthTitle, setCustomMonthTitle] = useState(() => computeMonthNameFromDate(initialStart));
+  const [monthSaveSuccess, setMonthSaveSuccess] = useState<string | null>(null);
+
   // New Month Modal
   const [isNewMonthModalOpen, setIsNewMonthModalOpen] = useState(false);
-  const [startDate, setStartDate] = useState(
-    new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-      .toISOString()
-      .split('T')[0]
-  );
-  const [endDate, setEndDate] = useState(
-    new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
-      .toISOString()
-      .split('T')[0]
-  );
+  const [startDate, setStartDate] = useState(initialStart);
+  const [endDate, setEndDate] = useState(initialEnd);
+
+  const handleSaveMonthAndReports = () => {
+    const finalTitle = customMonthTitle.trim() || computeMonthNameFromDate(calStartDate);
+    if (onSaveCurrentMonthArchive) {
+      onSaveCurrentMonthArchive(finalTitle);
+    }
+    setMonthSaveSuccess(
+      lang === 'bn'
+        ? `✅ ${finalTitle} এবং এর সকল রিপোর্ট সফলভাবে সেভ করা হয়েছে!`
+        : `✅ ${finalTitle} and all reports saved successfully!`
+    );
+    setTimeout(() => setMonthSaveSuccess(null), 4000);
+  };
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -205,11 +249,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       alert(lang === 'bn' ? 'অনুগ্রহ করে শুরুর ও শেষের তারিখ নির্বাচন করুন' : 'Please select dates');
       return;
     }
-    if (confirm(lang === 'bn' ? 'বর্তমান মাসের হিসাব সংরক্ষণ করে নতুন মাস শুরু করতে চান?' : 'Start new month and archive current?')) {
-      onStartNewMonth(startDate, endDate);
-      setIsNewMonthModalOpen(false);
-      alert(lang === 'bn' ? 'নতুন মাস সফলভাবে শুরু হয়েছে এবং পূর্বের হিসাব সংরক্ষণ করা হয়েছে।' : 'New month started and archived.');
-    }
+    const finalTitle = customMonthTitle.trim() || computeMonthNameFromDate(startDate);
+    onStartNewMonth(startDate, endDate, finalTitle);
+    setIsNewMonthModalOpen(false);
+    setMonthSaveSuccess(
+      lang === 'bn' ? 'নতুন মাস সফলভাবে শুরু হয়েছে এবং পূর্বের হিসাব সংরক্ষণ করা হয়েছে।' : 'New month started.'
+    );
+    setTimeout(() => setMonthSaveSuccess(null), 4000);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -248,13 +294,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
   };
 
   const handleExecuteReset = () => {
-    localStorage.setItem('hk_trans', '[]');
-    localStorage.setItem('hk_markets', '[]');
-    localStorage.setItem('hk_debt_people', '[]');
-    localStorage.setItem('hk_debt_hist', '[]');
-    localStorage.setItem('hk_budgets', '[]');
-    localStorage.setItem('hk_bill_payments', '[]');
-    window.location.reload();
+    if (onResetActiveMonthOnly) {
+      onResetActiveMonthOnly();
+    } else {
+      localStorage.setItem('hk_trans', '[]');
+      localStorage.setItem('hk_markets', '[]');
+      localStorage.setItem('hk_debt_people', '[]');
+      localStorage.setItem('hk_debt_hist', '[]');
+      localStorage.setItem('hk_budgets', '[]');
+      localStorage.setItem('hk_bill_payments', '[]');
+      window.location.reload();
+    }
+    setIsResetConfirmOpen(false);
   };
 
   const appShareUrl = window.location.href;
@@ -712,12 +763,12 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
         </div>
 
-        {/* 4. Month Archive Management (Restored Clean Design) */}
-        <div className="p-5 rounded-3xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 shadow-xs space-y-3.5">
+        {/* 4. Month Calendar & Archive Management */}
+        <div className="p-5 rounded-3xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-sm text-stone-800 dark:text-stone-100 flex items-center gap-2">
-              <CalendarPlus className="w-4 h-4 text-amber-600" />
-              <span>{t.monthArchiveMgmt}</span>
+              <Calendar className="w-4 h-4 text-emerald-600" />
+              <span>{lang === 'bn' ? 'ক্যালেন্ডার ও নতুন মাস নির্বাচন' : 'Calendar & Month Management'}</span>
             </h3>
             <span className="text-[10px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
               {archives.length > 0 ? `${archives.length} টি সংরক্ষিত` : 'চলমান মাস'}
@@ -726,22 +777,92 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
           <p className="text-xs text-stone-500">
             {lang === 'bn'
-              ? 'প্রতি মাসের শেষে নতুন মাস শুরু করে আগের মাসের পূর্ণাঙ্গ খাতা সংরক্ষণ করুন এবং ইচ্ছেমতো যেকোনো মাস নির্বাচন করে খাতা পরিচালনা করুন।'
-              : 'Archive current month and start fresh for new month, or freely select any month.'}
+              ? 'স্ব স্ব ডিভাইসের ক্যালেন্ডার থেকে মাসের শুরু ও শেষ তারিখ নির্বাচন করুন। মাসের নাম স্বয়ংক্রিয়ভাবে তৈরি হবে অথবা আপনি নিজের মতো লিখে দিতে পারেন। এরপর চলতি মাস ও সকল রিপোর্ট সেভ করুন।'
+              : 'Select month start and end dates from your device calendar. Month name is generated automatically and editable. Save your month and reports securely.'}
           </p>
 
-          {/* Start New Month Button */}
-          <button
-            onClick={() => setIsNewMonthModalOpen(true)}
-            className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-98 text-white font-bold text-xs shadow-xs flex items-center justify-center gap-2 transition cursor-pointer"
-          >
-            <CalendarPlus className="w-4 h-4" />
-            <span>{t.startNewMonth}</span>
-          </button>
-
-          {/* 1. ইচ্ছেমতো মাসের নাম নির্বাচন (Select Any Month - 12 Months Dropdown) */}
-          {onSelectMonth && selectedMonthIdx !== undefined && selectedYear !== undefined && (
+          {/* Native Calendar Pickers */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
+              <label className="block text-[11px] font-semibold text-stone-600 dark:text-stone-300 mb-1">
+                📅 {lang === 'bn' ? 'মাস শুরুর তারিখ:' : 'Start Date:'}
+              </label>
+              <input
+                type="date"
+                value={calStartDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCalStartDate(val);
+                  setCustomMonthTitle(computeMonthNameFromDate(val));
+                }}
+                className="w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl py-2 px-3 text-xs font-semibold text-stone-800 dark:text-stone-100 focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-stone-600 dark:text-stone-300 mb-1">
+                📅 {lang === 'bn' ? 'মাস শেষের তারিখ:' : 'End Date:'}
+              </label>
+              <input
+                type="date"
+                value={calEndDate}
+                onChange={(e) => setCalEndDate(e.target.value)}
+                className="w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl py-2 px-3 text-xs font-semibold text-stone-800 dark:text-stone-100 focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+              />
+            </div>
+          </div>
+
+          {/* Automatic / Editable Month Name */}
+          <div>
+            <label className="block text-[11px] font-semibold text-stone-600 dark:text-stone-300 mb-1">
+              ✏️ {lang === 'bn' ? 'মাসের নাম (অটোমেটিক তৈরি অথবা নিজে লিখে দিন):' : 'Month Name (Auto or Custom):'}
+            </label>
+            <input
+              type="text"
+              value={customMonthTitle}
+              onChange={(e) => setCustomMonthTitle(e.target.value)}
+              placeholder="যেমন: জানুয়ারি ২০২৬"
+              className="w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl py-2 px-3 text-xs font-bold text-stone-800 dark:text-stone-100 focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+
+          {/* Action Buttons: Save Month & Reports / Start Fresh */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+            <button
+              type="button"
+              onClick={handleSaveMonthAndReports}
+              className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+              <span>{lang === 'bn' ? 'মাস ও সকল রিপোর্ট সেভ করুন' : 'Save Month & Reports'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                const finalTitle = customMonthTitle.trim() || computeMonthNameFromDate(calStartDate);
+                onStartNewMonth(calStartDate, calEndDate, finalTitle);
+                setMonthSaveSuccess(
+                  lang === 'bn' ? 'নতুন মাসের খাতা শুরু হয়েছে!' : 'New month started!'
+                );
+                setTimeout(() => setMonthSaveSuccess(null), 3000);
+              }}
+              className="py-2.5 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer"
+            >
+              <CalendarPlus className="w-4 h-4" />
+              <span>{lang === 'bn' ? 'নতুন মাস শুরু করুন' : 'Start New Month'}</span>
+            </button>
+          </div>
+
+          {monthSaveSuccess && (
+            <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 text-xs text-emerald-800 dark:text-emerald-200 font-bold flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{monthSaveSuccess}</span>
+            </div>
+          )}
+
+          {/* 1. ইচ্ছেমতো মাসের নাম নির্বাচন (Dropdown) */}
+          {onSelectMonth && selectedMonthIdx !== undefined && selectedYear !== undefined && (
+            <div className="pt-2 border-t border-stone-200 dark:border-stone-800">
               <label className="block text-xs font-semibold text-stone-600 dark:text-stone-300 mb-1.5 flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-emerald-600" />
                 <span>{lang === 'bn' ? 'চলমান খাতার নির্ধারিত মাস নির্বাচন করুন:' : 'Select Active Ledger Month:'}</span>
@@ -760,8 +881,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             </div>
           )}
 
-          {/* 2. পূর্ববর্তী সংরক্ষিত মাস / আর্কাইভ নির্বাচন (Original Clean Dropdown) */}
-          <div>
+          {/* 2. পূর্ববর্তী সংরক্ষিত মাস / আর্কাইভ নির্বাচন */}
+          <div className="pt-2 border-t border-stone-200 dark:border-stone-800">
             <label className="block text-xs font-semibold text-stone-600 dark:text-stone-300 mb-1.5 flex items-center gap-1.5">
               <FolderArchive className="w-3.5 h-3.5 text-amber-600" />
               <span>{t.viewPreviousMonths}:</span>
@@ -795,7 +916,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
         </div>
 
-        {/* 7. Sample Data */}
+        {/* Sample Data */}
         {onLoadSampleData && (
           <div className="p-4 rounded-3xl bg-stone-100 dark:bg-stone-900/60 border border-stone-200 dark:border-stone-800 text-center">
             <button
@@ -831,7 +952,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 <input
                   type="date"
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    setCustomMonthTitle(computeMonthNameFromDate(e.target.value));
+                  }}
                   className="w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl py-2 px-3 text-sm text-stone-800 dark:text-stone-100"
                 />
               </div>
@@ -844,6 +968,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   className="w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl py-2 px-3 text-sm text-stone-800 dark:text-stone-100"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-stone-500 mb-1">
+                  {lang === 'bn' ? 'মাসের নাম:' : 'Month Name:'}
+                </label>
+                <input
+                  type="text"
+                  value={customMonthTitle}
+                  onChange={(e) => setCustomMonthTitle(e.target.value)}
+                  placeholder="যেমন: জানুয়ারি ২০২৬"
+                  className="w-full bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl py-2 px-3 text-xs font-semibold text-stone-800 dark:text-stone-100"
                 />
               </div>
             </div>
@@ -869,13 +1005,13 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
       {/* Reset Confirmation Modal */}
       <ConfirmDeleteModal
         isOpen={isResetConfirmOpen}
-        title={lang === 'bn' ? 'সকল হিসাব মুছে ফেলবেন?' : 'Reset All Data?'}
+        title={lang === 'bn' ? 'উক্ত মাসের হিসাব মুছবেন?' : 'Reset Month Data?'}
         message={
           lang === 'bn'
-            ? 'আপনি কি নিশ্চিত যে সকল হিসাব মুছে ফেলতে চান? সমস্ত লেনদেন, বাজার, বাজেট ও দেনা-পাওনা ফাঁকা হয়ে নতুনভাবে শুরু হবে।'
-            : 'Are you sure you want to delete all entries? All records will be cleared and reset to fresh state.'
+            ? 'উক্ত চলতি মাসের সকল ডাটা মুছে যাবে কিন্তু আপনার পূর্ববর্তী সকল মাসের সংরক্ষিত রিপোর্ট ও আর্কাইভ পার্মানেন্ট ডিলিট হবে না, সম্পূর্ণ নিরাপদে থাকবে।'
+            : 'Only this active month data will be cleared. All your previously saved month reports and archives are permanently safe and will not be deleted.'
         }
-        confirmText={lang === 'bn' ? 'হ্যাঁ, সম্পূর্ণ মুছুন' : 'Yes, Delete All'}
+        confirmText={lang === 'bn' ? 'হ্যাঁ, চলতি মাস মুছুন' : 'Yes, Reset Current Month'}
         cancelText={t.cancel}
         onConfirm={handleExecuteReset}
         onCancel={() => setIsResetConfirmOpen(false)}
